@@ -12,7 +12,23 @@ Blue markers show pending notes. Numbers start at 1 for each conversation and ba
 
 ## Install
 
-Supports DSH 0.2.2; tested with 0.2.2-rc.1. Download both tarballs from [v2.5.5](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.5), install them through DSH Plugins, then restart:
+Supports DSH 0.2.2; tested with 0.2.2-rc.1.
+
+On Windows, quit DSH and run in PowerShell:
+
+```powershell
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/install.ps1 | iex
+```
+
+The [installer](scripts/install.ps1) locates DSH, downloads and verifies both packages, and calls the official plugin command. Restart DSH afterward.
+
+With `dsh` on PATH, install directly from the release URLs:
+
+```sh
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-paper-margin-2.5.5.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+```
+
+For Web, replace `desktop` with `web`. To install manually, download both tarballs from [v2.5.5](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.5) and add them through DSH Plugins:
 
 - `dsh-paper-margin-2.5.5.tgz`
 - `dsh-sidenote-0.8.5-reader.3.tgz`

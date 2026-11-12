@@ -17,6 +17,26 @@
 
 需要 DSH **0.2.2 系列**，已在 **0.2.2-rc.1** 验证。
 
+### 一键安装（Windows）
+
+先退出 DSH，在 PowerShell 中运行：
+
+```powershell
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/install.ps1 | iex
+```
+
+脚本自动找到 DSH、下载并校验两个安装包，再调用官方插件安装命令。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
+
+已有 `dsh` 命令的终端可直接安装，无需手动下载：
+
+```sh
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-paper-margin-2.5.5.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+```
+
+Web 版将 `desktop` 改成 `web`。
+
+### 手动安装
+
 从 [v2.5.5 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.5) 下载两个文件：
 
 - `dsh-paper-margin-2.5.5.tgz`
