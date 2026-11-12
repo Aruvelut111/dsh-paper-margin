@@ -6,12 +6,14 @@
 
 ## 使用
 
-1. 在右侧打开文件，选中一段文字，点击**添加到对话**。
+1. 在右侧打开文件或原生浏览器网页，选中一段文字，点击**添加到对话**。
 2. 在原文旁写评论。Enter 确认，Shift+Enter 换行，也可以只引用原文。
 3. 主输入框显示 **N 条注释**，可以编辑、删除或点击来源回到原文。
 4. 写下问题并发送。Agent 会收到原文、评论、文件地址和可用的页码/单元格信息。
 
 待发送选区显示蓝色高亮和 1、2、3… 编号。编号按会话和批次排列，删除后补齐。发送成功后清除原文标记，已发内容从消息的「批注 ×N」回看。切换文件、会话和刷新保留未发送注释；关闭侧栏时收起高亮与浮窗。
+
+侧边聊天由 sidenote 提供，其中的划选加入该侧聊的输入框，随该侧聊发送。主会话与侧聊各自编号、保存和发送。
 
 ## 安装
 
@@ -22,7 +24,7 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/install.ps1 | iex
 ```
 
 脚本自动找到 DSH、下载并校验两个安装包，再调用官方插件安装命令。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
@@ -30,24 +32,24 @@ irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/ins
 已有 `dsh` 命令的终端可直接安装，无需手动下载：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-paper-margin-2.5.6.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-paper-margin-2.5.7.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
 ```
 
 Web 版将 `desktop` 改成 `web`。
 
 ### 手动安装
 
-从 [v2.5.6 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.6) 下载两个文件：
+从 [v2.5.7 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.7) 下载两个文件：
 
-- `dsh-paper-margin-2.5.6.tgz`
-- `dsh-sidenote-0.8.5-reader.4.tgz`
+- `dsh-paper-margin-2.5.7.tgz`
+- `dsh-sidenote-0.8.5-reader.5.tgz`
 
 在 DSH 的「插件 → 添加插件」中安装这两个包，然后重启。已有 sidenote 时，配套包替换同名插件，保留原有侧聊和本地注释。它是基于 [g-yixuan/dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的阅读集成分支，源码在 [Aruvelut111/dsh-sidenote](https://github.com/Aruvelut111/dsh-sidenote/tree/fix/external-reader-annotations)。
 
 CLI 也可以安装；文件路径按下载位置填写：
 
 ```sh
-dsh plugin --profile desktop add ./dsh-paper-margin-2.5.6.tgz ./dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add ./dsh-paper-margin-2.5.7.tgz ./dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
 ```
 
 ## 文件支持
@@ -60,8 +62,11 @@ dsh plugin --profile desktop add ./dsh-paper-margin-2.5.6.tgz ./dsh-sidenote-0.8
 | Word | 使用 DSH 的 Office 转换和可选文字层 |
 | HTML | 「打开方式 → HTML 批注阅读」，适合静态文档 |
 | 图片 | 整图文字评论与文件来源 |
+| 原生浏览器网页（桌面版） | 划选网页正文、就地写评论，按会话与完整 URL 保存，可点击来源重新打开定位 |
 
-扫描 PDF 需要文字层或外部 OCR。HTML 批注阅读保留内嵌样式，禁用原文脚本和外部资源。PPT 转换、远程网页批注仍依赖宿主，尚未完成专项实测。图片评论目前不自动发送图片像素。
+扫描 PDF 需要文字层或外部 OCR。HTML 批注阅读保留内嵌样式，禁用原文脚本和外部资源。PPT 转换仍依赖宿主，尚未完成专项实测。图片评论目前不自动发送图片像素。
+
+网页支持 DSH 桌面版原生侧栏浏览器的正文，不接管外部 Chrome、夸克或其他浏览器插件。跨域内嵌框架、Canvas 和封闭 Shadow DOM 不在此次支持范围。网页改变原文后可能无法重新定位；注释本身仍保留。登录与网页功能使用 DSH 原生策略，不读取外部浏览器登录态。
 
 ## 开发
 

@@ -154,6 +154,9 @@ export function attachUniversalAnnotator(options: UniversalAnnotatorOptions): ()
   function surfaceOf(node: Node): { element: Element; kind: string } | undefined {
     const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
     if (element === null) return undefined
+    // Sidenote owns side-chat selection, anchors and the child composer. Never
+    // reinterpret its reply as an external file belonging to the parent pane.
+    if (element.closest('[data-sidenote-chat-session]')) return undefined
     if (element.closest('[data-paper-margin], [data-paper-margin-editor], [data-paper-margin-panel], [data-paper-margin-notebook], [data-dsh-sidenote], input, textarea, [contenteditable]')) return undefined
     if (document.querySelector('[data-dsh-sidenote]') && element.closest('[data-conversation-content]') && !element.closest('[data-textpreview-body]')) return undefined
     for (const { selector, kind } of SOURCE_SELECTORS) {

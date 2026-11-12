@@ -1,12 +1,27 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { observeReaderRoots, observeReaderVisibility } from '../src/client/annotate/reader-surface'
+import { observeReaderRoots, observeReaderVisibility, readerSessionId } from '../src/client/annotate/reader-surface'
 import { readerControls } from '../src/client/viewer/controls'
 import { attachDocumentNotes } from '../src/client/annotate/document-notes'
 import { createAnnotationStore } from './fixtures/sidenote/src/client/annotations/model'
 import { registerExternalAnnotations } from './fixtures/sidenote/src/client/annotations/external'
+import { attachUniversalAnnotator } from '../src/client/annotate/universal'
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve() }
+it('uses the nearest conversation owner before the outer sidebar owner', () => {
+  document.body.innerHTML = '<main data-conversation-session="parent"><aside data-sidebar-right-session="parent"><div id="file"></div><section data-sidenote-chat-session="child"><p id="reply"></p></section><section data-conversation-session="other-child"><p id="other"></p></section></aside></main>'
+  expect(readerSessionId(document.querySelector('#reply')!)).toBe('child')
+  expect(readerSessionId(document.querySelector('#other')!)).toBe('other-child')
+  expect(readerSessionId(document.querySelector('#file')!)).toBe('parent')
+})
+it('leaves side-chat replies to sidenote instead of adding a second parent toolbar', async () => {
+  document.body.innerHTML = '<aside data-sidebar-right-session="parent"><section data-sidenote-chat-session="child"><div data-markdown-variant="chat">side reply</div></section></aside>'
+  const capture = vi.fn(); const stop = attachUniversalAnnotator({onAnnotate:capture})
+  const range=document.createRange();range.selectNodeContents(document.querySelector('[data-markdown-variant]')!);window.getSelection()?.addRange(range)
+  document.dispatchEvent(new MouseEvent('mouseup',{button:0}));await settle()
+  expect((document.querySelector('[data-paper-margin-toolbar]') as HTMLElement)?.style.display).toBe('none')
+  expect(capture).not.toHaveBeenCalled();stop();window.getSelection()?.removeAllRanges()
+})
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 it('ignores thousands of text-layer mutations but reacts to ancestor closure and removal', async () => {

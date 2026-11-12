@@ -156,7 +156,7 @@ function applyInner(ctx: unknown): void {
     c.effect?.(() => attachExternalReveal(registry, address => (c.sidebarRight as { openResource?(address: string): void })?.openResource?.(address), message => {
       const notice = document.createElement('div'); notice.setAttribute('role', 'status'); notice.textContent = message; notice.style.cssText = 'position:fixed;bottom:24px;left:50%;z-index:2147483000;padding:10px 16px;background:#26344a;color:white;border-radius:7px'; document.body.append(notice); setTimeout(() => notice.remove(), 3500)
     }), 'paper-margin: reveal external source')
-    const web = attachWebAnnotations(capture)
+    const web = attachWebAnnotations(capture, address => (c.sidebarRight as { openTab?(type: string, options: {params:{url:string}}): void })?.openTab?.('browser', {params:{url:address}}))
     c.effect?.(() => attachExcelAnnotations(capture), 'dsh-paper-margin: spreadsheet annotator')
     c.effect?.(() => attachImageAnnotations(capture), 'dsh-paper-margin: image annotator')
     c.effect?.(() => web, 'dsh-paper-margin: web annotator')

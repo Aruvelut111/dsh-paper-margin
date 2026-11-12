@@ -1,6 +1,24 @@
 import { expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
 import { build } from 'esbuild'
+it('reuses one text projection across notes and scrolling, and suspends saved overlays', async () => {
+  const compiled=await build({entryPoints:['src/client/annotate/web.ts'],bundle:true,write:false,format:'iife',globalName:'Guest',minify:true,platform:'browser',target:'es2022'})
+  const dom=new JSDOM('<body>'+Array.from({length:40},(_,i)=>'<p>unique passage '+i+' end</p>').join('')+'</body>',{url:'https://example.test/article',runScripts:'dangerously',pretendToBeVisual:true})
+  const win=dom.window
+  win.Range.prototype.getClientRects=()=>[new win.DOMRect(10,20,80,18)] as unknown as DOMRectList
+  let walks=0;const original=win.document.createTreeWalker.bind(win.document);win.document.createTreeWalker=((...args:Parameters<Document['createTreeWalker']>)=>{walks++;return original(...args)}) as Document['createTreeWalker']
+  win.eval(compiled.outputFiles[0]!.text+';Guest.installGuestOverlay(window)')
+  const api=(win as unknown as {__paperMarginGuest:{setNotes(notes:unknown[]):void;suspend():void;resume():void;dispose():unknown}}).__paperMarginGuest
+  api.setNotes(Array.from({length:40},(_,i)=>({id:i,number:i+1,state:'active',anchorText:'unique passage '+i+' end',note:''})))
+  await new Promise(r=>setTimeout(r,50));expect(walks).toBe(1)
+  for(let i=0;i<100;i++)win.dispatchEvent(new win.Event('scroll'))
+  await new Promise(r=>setTimeout(r,40));expect(walks).toBe(1)
+  api.suspend();expect((win.document.querySelector('div[data-paper-margin-web]') as HTMLElement).style.display).toBe('none')
+  api.resume();await new Promise(r=>setTimeout(r,30));expect(walks).toBe(1)
+  win.document.querySelector('p')!.textContent='unique passage 0 end revised'
+  await new Promise(r=>setTimeout(r,40));expect(walks).toBe(2)
+  api.dispose();dom.window.close()
+})
 it('executes the minified serialized guest, preserves typed notes, and does not ack newer edits', async () => {
   const compiled = await build({ entryPoints: ['src/client/annotate/web.ts'], bundle: true, write: false, format: 'iife', globalName: 'Guest', minify: true, platform: 'browser', target: 'es2022' })
   const dom = new JSDOM('<body><p>selected passage</p></body>', { url: 'https://example.test/page', runScripts: 'dangerously', pretendToBeVisual: true })

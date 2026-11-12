@@ -2,14 +2,14 @@ import type { CapturedSelection } from './universal'
 import { documentNotes } from './document-notes'
 import type { TextAnchor } from './text-anchor'
 import { removeFromSidenote } from './sidenote'
-import { readerSessionId, readerSurfaceVisible } from './reader-surface'
+import { readerSessionId, readerSurfaceVisible, observeReaderVisibility, observeReaderRoots } from './reader-surface'
 interface GuestItem { id: string; revision?: number; quote: string; note: string; url: string; title: string; image?: boolean; anchor?: TextAnchor; removeId?: number; remove?: boolean }
 interface GuestSaved { id: number; number: number; anchorText: string; note: string; state: string; externalCaptureId?: string; externalSource?: { anchor?: TextAnchor } }
-interface GuestApi { peek(): GuestItem[]; ack(ids: string[]): void; setNotes(notes: GuestSaved[]): void; suspend(): void; reveal(text: string, anchor?: TextAnchor): boolean; dispose(): GuestItem[] }
+interface GuestApi { peek(): GuestItem[]; ack(ids: string[]): void; setNotes(notes: GuestSaved[]): void; suspend(): void; resume(): void; reveal(text: string, anchor?: TextAnchor): boolean; dispose(): GuestItem[] }
 type GuestWindow = Window & { __paperMarginGuest?: GuestApi }
 
 /** Self-contained: serialized into a desktop guest, without importing host code. */
-export function installGuestOverlay(win: GuestWindow): void {
+export function installGuestOverlay(win: GuestWindow, changed?: () => void): void {
   if (win.__paperMarginGuest) return
   const doc = win.document
   const items: GuestItem[] = []
@@ -19,7 +19,7 @@ export function installGuestOverlay(win: GuestWindow): void {
   Object.assign(button.style, { position: 'fixed', display: 'none', zIndex: '2147483646', background: '#26344a', color: 'white', padding: '7px 12px', border: '1px solid #9baac0', borderRadius: '6px', cursor: 'pointer', font: '13px sans-serif' })
   doc.body.append(button)
   let quote = ''; let image = false; let anchor: TextAnchor | undefined; let selectedNote: GuestSaved | undefined
-  let saved: GuestSaved[] = []; let savedSignature = ''; let drawFrame = 0
+  let saved: GuestSaved[] = []; let savedSignature = ''; let drawFrame = 0; let suspended = false
   const layer = doc.createElement('div'); layer.dataset.paperMarginWeb = ''; layer.style.cssText = 'position:fixed;inset:0;z-index:2147483645;pointer-events:none'; doc.body.append(layer)
   const textNodes = () => {
     const walker = doc.createTreeWalker(doc.body, 4, { acceptNode: node => node.parentElement?.closest('button,textarea,input,script,style,[data-paper-margin-web]') ? 2 : 1 })
@@ -27,8 +27,10 @@ export function installGuestOverlay(win: GuestWindow): void {
     while ((node = walker.nextNode())) { nodes.push(node as Text); text += node.textContent ?? '' }
     return { nodes, text }
   }
+  let projection: ReturnType<typeof textNodes> | undefined
+  const ranges = new Map<number, Range>()
   const resolve = (quote: string, selector?: TextAnchor): Range | undefined => {
-    const { nodes, text } = textNodes(); const exact = selector?.exact || quote; if (!exact.trim()) return
+    const { nodes, text } = projection ??= textNodes(); const exact = selector?.exact || quote; if (!exact.trim()) return
     const matches: number[] = []; for (let at = text.indexOf(exact); at >= 0; at = text.indexOf(exact, at + 1)) matches.push(at)
     const context = selector ? matches.filter(at => text.slice(Math.max(0, at - selector.prefix.length), at) === selector.prefix && text.slice(at + exact.length, at + exact.length + selector.suffix.length) === selector.suffix) : []
     const start = context.length === 1 ? context[0] : matches.length === 1 ? matches[0] : undefined; if (start === undefined) return
@@ -37,10 +39,19 @@ export function installGuestOverlay(win: GuestWindow): void {
   }
   const reveal = (text: string, anchor?: TextAnchor): boolean => { const range = resolve(text, anchor); if (!range) return false; range.startContainer.parentElement?.scrollIntoView?.({ block: 'center' }); scheduleDraw(); return true }
   const draw = () => {
-    drawFrame = 0; layer.replaceChildren(); let previous = -24
-    for (const note of saved) {
-      const range = resolve(note.anchorText, note.externalSource?.anchor); if (!range || typeof range.getClientRects !== 'function') continue
-      const rects = [...range.getClientRects()]; const rect = rects.find(rect => rect.bottom > 0 && rect.top < win.innerHeight); if (!rect) continue
+    drawFrame = 0
+    if (suspended) return
+    // Resolve text once per content revision. Scrolling only measures cached
+    // ranges; overlay writes happen after every range has been measured.
+    const plans = saved.map(note => {
+      let range = ranges.get(note.id)
+      if (!range?.startContainer.isConnected || !range.endContainer.isConnected) range = resolve(note.anchorText, note.externalSource?.anchor)
+      if (range) ranges.set(note.id, range)
+      return {note, rects: range && typeof range.getClientRects === 'function' ? [...range.getClientRects()] : []}
+    })
+    layer.replaceChildren(); let previous = -24
+    for (const {note, rects} of plans) {
+      const rect = rects.find(rect => rect.bottom > 0 && rect.top < win.innerHeight); if (!rect) continue
       for (const rect of rects) { const mark = doc.createElement('span'); mark.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;background:#2f88ff22;pointer-events:none`; layer.append(mark) }
       const badge = doc.createElement('button'); badge.type = 'button'; badge.dataset.paperMarginGuestBadge = String(note.id); badge.textContent = String(note.number); badge.title = note.anchorText + '\n' + note.note; badge.setAttribute('aria-label', `查看阅读批注 ${note.number}`)
       const top = Math.max(2, rect.top, previous + 23); if (top + 20 > win.innerHeight) continue; previous = top
@@ -61,7 +72,7 @@ export function installGuestOverlay(win: GuestWindow): void {
     const parent = range?.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer as Element : range?.commonAncestorContainer.parentElement
     if (!range || !selection || selection.isCollapsed || parent?.closest('textarea,input,[contenteditable], [data-paper-margin-web]')) { button.style.display = 'none'; return }
     quote = selection.toString(); image = false; selectedNote = undefined; anchor = undefined
-    const content = textNodes(); let offset = 0; let start = -1; let end = -1
+    const content = projection ??= textNodes(); let offset = 0; let start = -1; let end = -1
     for (const node of content.nodes) { if (node === range.startContainer) start = offset + range.startOffset; if (node === range.endContainer) end = offset + range.endOffset; offset += node.length }
     if (start >= 0 && end > start) anchor = { exact: content.text.slice(start, end), start, prefix: content.text.slice(Math.max(0, start - 48), start), suffix: content.text.slice(end, end + 48) }
     if (!quote.trim()) return
@@ -90,10 +101,11 @@ export function installGuestOverlay(win: GuestWindow): void {
       discardEditor?.()
       for (let index = items.length - 1; index >= 0; index--) if (items[index]!.id === item.id) items.splice(index, 1)
       items.push({ ...item, revision: ++nextRevision, note: input.value, remove: true, removeId: selectedId })
+      changed?.()
       saved = saved.filter(note => note.id !== selectedId); selectedNote = undefined; scheduleDraw()
     })
     let composing = false; let done = false
-    const queueNote = () => { if (readonly) return; const previous = items.findIndex(record => record.id === item.id); const record = { ...item, revision: ++nextRevision, note: input.value }; if (previous < 0) items.push(record); else items[previous] = record }
+    const queueNote = () => { if (readonly) return; const previous = items.findIndex(record => record.id === item.id); const record = { ...item, revision: ++nextRevision, note: input.value }; if (previous < 0) items.push(record); else items[previous] = record; changed?.() }
     const outside = (event: Event) => { if (!box.contains(event.target as Node)) save() }
     const save = () => {
       if (done) return; queueNote(); discardEditor?.()
@@ -107,6 +119,15 @@ export function installGuestOverlay(win: GuestWindow): void {
     button.style.display = 'none'; quote = ''; win.getSelection()?.removeAllRanges()
   }
   const hide = () => { button.style.display = 'none'; scheduleDraw() }
+  const Observer = (win as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
+  const contentObserver = new Observer(records => {
+    if (records.every(record => (record.target.nodeType === 1 ? record.target as Element : record.target.parentElement)?.closest('[data-paper-margin-web]'))) return
+    // Ignore the insertion/removal of our root controls too.
+    if (records.every(record => record.type === 'childList' && [...record.addedNodes, ...record.removedNodes].every(node => node.nodeType === 1 && (node as Element).matches('[data-paper-margin-web]')))) return
+    projection = undefined; ranges.clear()
+    if (saved.length) scheduleDraw()
+  })
+  contentObserver.observe(doc.body, {subtree:true, childList:true, characterData:true})
   const keyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') hide(); else if (event.shiftKey) select() }
   const click = (event: MouseEvent) => { if (event.detail === 0) capture(event) }
   doc.addEventListener('mouseup', select); doc.addEventListener('contextmenu', context); doc.addEventListener('keyup', keyboard); win.addEventListener('scroll', hide, true); win.addEventListener('resize', scheduleDraw)
@@ -118,19 +139,20 @@ export function installGuestOverlay(win: GuestWindow): void {
       const retired = new Set(saved.filter(note => !active.some(current => current.id === note.id)).map(note => note.externalCaptureId).filter(Boolean))
       for (let index = items.length - 1; index >= 0; index--) if (!items[index]!.remove && retired.has(items[index]!.id)) items.splice(index, 1)
       if (editorCaptureId && retired.has(editorCaptureId) || selectedNote && !active.some(note => note.id === selectedNote!.id)) { discardEditor?.(); selectedNote = undefined }
-      const signature = JSON.stringify(active); if (signature !== savedSignature) { savedSignature = signature; saved = active; scheduleDraw() }
+      const signature = JSON.stringify(active); if (signature !== savedSignature) { savedSignature = signature; saved = active; ranges.clear(); scheduleDraw() }
     },
     reveal,
-    suspend: () => { saveEditor?.(); button.style.display = 'none'; win.getSelection()?.removeAllRanges() },
+    suspend: () => { suspended = true; saveEditor?.(); button.style.display = 'none'; layer.style.display = 'none'; win.getSelection()?.removeAllRanges() },
+    resume: () => { if (suspended) { suspended = false; layer.style.display = ''; scheduleDraw() } },
     ack: ids => { for (let i = items.length - 1; i >= 0; i--) if (ids.includes(items[i]!.id + ':' + (items[i]!.revision ?? 0))) items.splice(i, 1) },
-    dispose: () => { saveEditor?.(); editor?.remove(); doc.removeEventListener('mouseup', select); doc.removeEventListener('contextmenu', context); doc.removeEventListener('keyup', keyboard); win.removeEventListener('scroll', hide, true); win.removeEventListener('resize', scheduleDraw); win.cancelAnimationFrame(drawFrame); layer.remove(); button.remove(); delete win.__paperMarginGuest; return items.slice() },
+    dispose: () => { contentObserver.disconnect(); saveEditor?.(); editor?.remove(); doc.removeEventListener('mouseup', select); doc.removeEventListener('contextmenu', context); doc.removeEventListener('keyup', keyboard); win.removeEventListener('scroll', hide, true); win.removeEventListener('resize', scheduleDraw); win.cancelAnimationFrame(drawFrame); layer.remove(); button.remove(); ranges.clear(); projection = undefined; delete win.__paperMarginGuest; return items.slice() },
   }
 }
 
 interface Webview extends HTMLElement { executeJavaScript(code: string, userGesture?: boolean): Promise<unknown>; getURL?(): string }
 /** The bridge only reads explicit captures; a note is acknowledged after storage. */
-export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => string | object | undefined): () => void {
-  const watched = new Map<Element, { busy: boolean; owner?: string; ready: () => void; dispose: () => void; notice?: HTMLElement }>()
+export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => string | object | undefined, open?: (address: string) => void): () => void {
+  const watched = new Map<Element, { busy: boolean; again?: boolean; owner?: string; signal: string; signature?: string; ready: () => void; dispose: () => void; notice?: HTMLElement }>()
   let stopped = false
   const persist = (element: Element, records: GuestItem[], owner = watched.get(element)?.owner) => {
     const ids: string[] = []
@@ -143,37 +165,39 @@ export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => 
     }
     return ids
   }
-  const source = `(${installGuestOverlay.toString()})(window); true`
   const tick = async (element: Element) => {
-    const state = watched.get(element); if (!state || state.busy || stopped) return
+    const state = watched.get(element); if (!state || stopped) return
+    if (state.busy) { state.again = true; return }
     state.busy = true
     try {
-      if (readerSessionId(element) !== state.owner) { state.dispose(); watched.delete(element); return }
-      let api: GuestApi | undefined; let records: GuestItem[]
+      if (readerSessionId(element) !== state.owner) { state.dispose(); watched.delete(element); queueMicrotask(scan); return }
+      let api: GuestApi | undefined; let records: GuestItem[]; let url: string
+      const visible = readerSurfaceVisible(element)
       if (element.tagName.toLowerCase() === 'webview') {
         const webview = element as Webview
-        const response = await webview.executeJavaScript('window.__paperMarginGuest?.peek() ?? null', false)
-        if (response === null) { await webview.executeJavaScript(source, false); return }
-        records = response as GuestItem[]
+        const source = `(${installGuestOverlay.toString()})(window,()=>console.debug(${JSON.stringify(state.signal)}));`
+        const response = await webview.executeJavaScript(`(()=>{${source} const api=window.__paperMarginGuest;api.${visible ? 'resume' : 'suspend'}();return {items:api.peek(),url:location.href}})()`, false) as {items:GuestItem[];url:string}
+        records = response.items; url = response.url
       } else {
         const win = (element as HTMLIFrameElement).contentWindow as GuestWindow | null
         if (!win?.document.body) return
-        installGuestOverlay(win); api = win.__paperMarginGuest; records = api?.peek() ?? []
+        installGuestOverlay(win, () => queueMicrotask(() => void tick(element))); api = win.__paperMarginGuest
+        if (visible) api?.resume(); else api?.suspend()
+        records = api?.peek() ?? []; url = win.location.href
       }
       if (!Array.isArray(records)) return
-      if (!readerSurfaceVisible(element)) {
-        if (api) api.suspend()
-        else await (element as Webview).executeJavaScript('window.__paperMarginGuest?.suspend()', false)
-      }
-      if (watched.get(element) !== state) return
+      if (watched.get(element) !== state || stopped || readerSessionId(element) !== state.owner) return
       const ids = persist(element, api?.peek() ?? records, state.owner)
-      const url = element.tagName.toLowerCase() === 'webview' ? (element as Webview).getURL?.() : (element as HTMLIFrameElement).contentWindow?.location.href
       const notes = state.owner && url ? documentNotes(state.owner, url) : []
-      if (api) api.setNotes(notes)
-      else await (element as Webview).executeJavaScript(`window.__paperMarginGuest?.setNotes(${JSON.stringify(notes)})`, false)
+      const signature = JSON.stringify([url, notes])
+      if (signature !== state.signature) {
+        if (api) api.setNotes(notes)
+        else await (element as Webview).executeJavaScript(`location.href===${JSON.stringify(url)}&&window.__paperMarginGuest?.setNotes(${JSON.stringify(notes)})`, false)
+        state.signature = signature
+      }
       if (ids.length) {
         if (api) api.ack(ids)
-        else await (element as Webview).executeJavaScript(`window.__paperMarginGuest?.ack(${JSON.stringify(ids)})`, false)
+        else await (element as Webview).executeJavaScript(`location.href===${JSON.stringify(url)}&&window.__paperMarginGuest?.ack(${JSON.stringify(ids)})`, false)
       }
       element.setAttribute('data-paper-margin-web-status', 'ready')
       state.notice?.remove(); state.notice = undefined
@@ -185,18 +209,26 @@ export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => 
         element.parentElement?.insertBefore(notice, element); state.notice = notice
       }
     }
-    finally { state.busy = false }
+    finally { state.busy = false; if (state.again && !stopped && watched.get(element) === state) { state.again = false; queueMicrotask(() => void tick(element)) } }
   }
   const scan = () => {
     for (const [element, state] of watched) if (!element.isConnected) { state.dispose(); watched.delete(element) }
     for (const element of document.querySelectorAll('webview[data-sidebar-browser-frame], iframe[data-sidebar-browser-frame], iframe[data-html-preview]')) {
       if (!watched.has(element)) {
-        const ready = () => { void tick(element) }
+        const ready = () => { const state = watched.get(element); if (state) state.signature = undefined; void tick(element) }
+        const signal = 'paper-margin-dirty:' + crypto.randomUUID()
+        // Only an opaque wake-up signal crosses the guest console. Notes and
+        // page contents are read from the leased webview, never logged.
+        const dirty = (event: Event) => { const message = (event as Event & { message?: string; details?: {message?: string} }); if ((message.message ?? message.details?.message) === signal) queueMicrotask(() => void tick(element)) }
         element.addEventListener('dom-ready', ready); element.addEventListener('load', ready)
+        element.addEventListener('console-message', dirty)
         const owner = readerSessionId(element)
-        watched.set(element, { busy: false, owner, ready, dispose: () => {
+        const visibility = observeReaderVisibility(element, () => void tick(element))
+        watched.set(element, { busy: false, owner, signal, ready, dispose: () => {
+          visibility()
           watched.get(element)?.notice?.remove()
           element.removeEventListener('dom-ready', ready); element.removeEventListener('load', ready)
+          element.removeEventListener('console-message', dirty)
           try {
             if (element.tagName.toLowerCase() === 'webview') void (element as Webview).executeJavaScript('window.__paperMarginGuest?.dispose() ?? []', false).then(items => { if (Array.isArray(items)) persist(element, items, owner) }).catch(() => undefined)
             else { const items = ((element as HTMLIFrameElement).contentWindow as GuestWindow | null)?.__paperMarginGuest?.dispose(); if (items) persist(element, items, owner) }
@@ -206,6 +238,22 @@ export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => 
       void tick(element)
     }
   }
-  const timer = setInterval(scan, 700); scan()
-  return () => { stopped = true; clearInterval(timer); for (const state of watched.values()) state.dispose(); watched.clear() }
+  const sync = () => { for (const element of watched.keys()) void tick(element) }
+  const reveal = async (event: Event) => {
+    const detail = (event as CustomEvent<{sessionId?:string; text?:string; source?:{address?:string;anchor?:TextAnchor}}>).detail
+    const address = detail?.source?.address
+    if (!address || !/^https?:\/\//i.test(address) || !detail.text) return
+    const find = () => [...watched.keys()].find(element => readerSessionId(element) === detail.sessionId && readerSurfaceVisible(element) && (element.tagName.toLowerCase() === 'webview' ? (element as Webview).getURL?.() === address : (element as HTMLIFrameElement).src === address))
+    let target = find()
+    if (!target && open) { open(address); for (let i = 0; i < 40 && !target && !stopped; i++) { await new Promise(resolve => setTimeout(resolve, 100)); scan(); target = find() } }
+    if (!target || stopped) return
+    if (target.tagName.toLowerCase() === 'webview') await (target as Webview).executeJavaScript(`window.__paperMarginGuest?.reveal(${JSON.stringify(detail.text)},${JSON.stringify(detail.source?.anchor)})`, false)
+    else ((target as HTMLIFrameElement).contentWindow as GuestWindow | null)?.__paperMarginGuest?.reveal(detail.text, detail.source?.anchor)
+  }
+  const onReveal = (event: Event) => { void reveal(event).catch(() => undefined) }
+  const stopDiscovery = observeReaderRoots('webview[data-sidebar-browser-frame], iframe[data-sidebar-browser-frame], iframe[data-html-preview]', scan)
+  document.addEventListener('dsh-sidenote:external-annotations-changed', sync)
+  document.addEventListener('dsh-sidenote:reveal-external:v1', onReveal)
+  const timer = setInterval(sync, 700); scan()
+  return () => { stopped = true; clearInterval(timer); stopDiscovery(); document.removeEventListener('dsh-sidenote:external-annotations-changed', sync); document.removeEventListener('dsh-sidenote:reveal-external:v1', onReveal); for (const state of watched.values()) state.dispose(); watched.clear() }
 }

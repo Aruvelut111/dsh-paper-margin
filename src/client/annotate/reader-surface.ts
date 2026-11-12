@@ -10,9 +10,12 @@ export function readerSurfaceVisible(root: Element): boolean {
   return true
 }
 export function readerSessionId(root: Element): string | undefined {
-  return root.closest('[data-sidebar-right-session]')?.getAttribute('data-sidebar-right-session') || root.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') || undefined
+  // A side conversation lives inside its parent's sidebar. Its own session
+  // owns selections; the outer sidebar identifies only the hosting layout.
+  const owner = root.closest('[data-sidenote-chat-session], [data-conversation-session], [data-sidebar-right-session]')
+  return owner?.getAttribute('data-sidenote-chat-session') || owner?.getAttribute('data-conversation-session') || owner?.getAttribute('data-sidebar-right-session') || undefined
 }
-export const READER_VISIBILITY_ATTRIBUTES = ['hidden', 'aria-hidden', 'class', 'style', 'data-sidebar-right-open', 'data-sidebar-right-session', 'data-conversation-session']
+export const READER_VISIBILITY_ATTRIBUTES = ['hidden', 'aria-hidden', 'class', 'style', 'data-sidebar-right-open', 'data-sidebar-right-session', 'data-conversation-session', 'data-sidenote-chat-session']
 
 /** Text layers can add thousands of descendants. Only the ancestor chain can
  * hide a reader; watching its descendants also observes our own toolbar writes. */

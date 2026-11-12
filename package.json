@@ -1,6 +1,6 @@
 {
   "name": "dsh-paper-margin",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Read files in the DSH sidebar, annotate selected text, and send notes with your next message.",
   "type": "module",
   "license": "MIT",

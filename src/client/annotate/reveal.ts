@@ -7,6 +7,7 @@ export function attachExternalReveal(registry: PdfViewRegistry, open: (address: 
   const reveal = async (event: Event) => {
     const detail = (event as CustomEvent<{ sessionId?: string; text?: string; source?: { label?: string; address?: string; page?: number; anchor?: TextAnchor } }>).detail
     const address = detail?.source?.address
+    if (typeof address === 'string' && /^https?:\/\//i.test(address)) return // Native webview bridge owns web sources.
     if (typeof address !== 'string' || !address.startsWith('dsh-resource://file/')) { notify('此来源请在原网页中查看'); return }
     open(address)
     if (!/\.pdf(?:$|[?#])/i.test(address)) {

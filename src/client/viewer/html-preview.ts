@@ -17,7 +17,7 @@ export function annotationHtml(input: string, token: string): string {
   script.textContent = `(${installGuestOverlay.toString()})(window);
 const channel=${JSON.stringify(token)};
 const flush=()=>{const items=window.__paperMarginGuest?.peek()||[];if(items.length)parent.postMessage({type:'paper-margin:html',channel,items},'*')};
-window.addEventListener('message',e=>{if(e.source!==parent||e.data?.channel!==channel)return;if(Array.isArray(e.data.ack))window.__paperMarginGuest?.ack(e.data.ack);if(Array.isArray(e.data.notes))window.__paperMarginGuest?.setNotes(e.data.notes);if(e.data.suspend)window.__paperMarginGuest?.suspend();if(typeof e.data.reveal?.text==='string')window.__paperMarginGuest?.reveal(e.data.reveal.text,e.data.reveal.anchor)});
+window.addEventListener('message',e=>{if(e.source!==parent||e.data?.channel!==channel)return;if(Array.isArray(e.data.ack))window.__paperMarginGuest?.ack(e.data.ack);if(Array.isArray(e.data.notes)){window.__paperMarginGuest?.resume();window.__paperMarginGuest?.setNotes(e.data.notes)}if(e.data.suspend)window.__paperMarginGuest?.suspend();if(typeof e.data.reveal?.text==='string')window.__paperMarginGuest?.reveal(e.data.reveal.text,e.data.reveal.anchor)});
 parent.postMessage({type:'paper-margin:html-ready',channel},'*');
 document.addEventListener('input',flush);document.addEventListener('click',()=>queueMicrotask(flush));document.addEventListener('keydown',()=>queueMicrotask(flush));document.addEventListener('mousedown',()=>queueMicrotask(flush));setInterval(flush,500);
 window.addEventListener('pagehide',()=>{const items=window.__paperMarginGuest?.dispose()||[];if(items.length)parent.postMessage({type:'paper-margin:html',channel,items},'*')});`
