@@ -31,6 +31,9 @@ if (-not $DshPath -or -not (Test-Path -LiteralPath $DshPath -PathType Leaf)) {
 
 $downloadDir = Join-Path ([System.IO.Path]::GetTempPath()) ('dsh-paper-margin-' + [guid]::NewGuid().ToString('N'))
 $downloaded = @()
+$archives = @()
+$dshHome = if ([string]::IsNullOrWhiteSpace($env:DSH_HOME)) { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dsh' } else { $env:DSH_HOME.Trim() }
+$archiveDir = Join-Path $dshHome 'plugin-archives/paper-margin'
 New-Item -ItemType Directory -Path $downloadDir | Out-Null
 try {
     foreach ($package in $packages) {
@@ -41,8 +44,16 @@ try {
         if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.Sha256) {
             throw ('Download checksum mismatch: ' + $package.Name)
         }
+        # DSH saves local archives as file: dependencies. Keep their source
+        # outside the temporary download directory for later package operations.
+        New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
+        $archive = Join-Path $archiveDir ($package.Sha256 + '-' + $package.Name)
+        if (-not (Test-Path -LiteralPath $archive) -or (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.Sha256) {
+            Copy-Item -LiteralPath $file -Destination $archive -Force
+        }
+        $archives += (Resolve-Path -LiteralPath $archive).Path
     }
-    & $DshPath plugin --profile $Profile add @downloaded --ignore-scripts --save-exact
+    & $DshPath plugin --profile $Profile add @archives --ignore-scripts --save-exact
     if ($LASTEXITCODE -ne 0) { throw ('DSH installation failed with exit code ' + $LASTEXITCODE) }
     Write-Host ('Installed Paper Margin 2.5.7 and sidenote 0.8.5-reader.5 in profile ' + $Profile + '. Restart DSH to load them.')
 } finally {
