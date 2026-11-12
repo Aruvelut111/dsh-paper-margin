@@ -1,0 +1,15 @@
+node_modules/
+lib/
+work/
+*.tgz
+.env
+.env.*
+coverage/
+test-results/
+playwright-report/
+AUDIT-*.md
+scripts/bisect-inject.mjs
+scripts/e2e-stream.mjs
+scripts/verify-pdf-parse.mjs
+scripts/verify-byte-source.mjs
+.DS_Store

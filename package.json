@@ -1,0 +1,79 @@
+{
+  "name": "dsh-paper-margin",
+  "version": "2.5.5",
+  "description": "Read files in the DSH sidebar, annotate selected text, and send notes with your next message.",
+  "type": "module",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.txt",
+    "README_EN.md",
+    "licenses",
+    "docs/reader-bridge.md"
+  ],
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": ">=0.2.2-rc.1 <0.2.3-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "dshSupport": {
+    "minimum": "0.2.2-rc.1",
+    "verified": [
+      "0.2.2-rc.1"
+    ]
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:arch": "node scripts/check-arch.mjs",
+    "check": "npm run check:arch && npm run typecheck && npm run build && npm run test",
+    "verify:open": "node scripts/verify-reader.mjs",
+    "verify:bytes": "node scripts/verify-reader.mjs --bytes-only"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "^3.19.0",
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^24.0.0",
+    "dompurify": "3.4.17",
+    "esbuild": "^0.28.0",
+    "jsdom": "^26.1.0",
+    "pdfjs-dist": "4.10.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "author": "Aruvelut",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aruvelut111/dsh-paper-margin.git"
+  },
+  "homepage": "https://github.com/Aruvelut111/dsh-paper-margin#readme",
+  "bugs": {
+    "url": "https://github.com/Aruvelut111/dsh-paper-margin/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "pdf",
+    "annotation"
+  ]
+}

@@ -1,0 +1,307 @@
+/**
+ * The annotation store: per-session numbered selection annotations. Pure
+ * (DOM-free, React-free) so the whole lifecycle is unit-testable. One instance
+ * per plugin activation.
+ *
+ * 待发送注释按创建顺序编号 1..n，删除后补齐；发送时冻结消息中的编号。
+ * 下一批重新从 1 开始。id 仅用于本地对象标识，不发送给模型。
+ *
+ * State machine per annotation: 'active' (counts in the composer chip, rides
+ * the next message via the send interceptor) → 'sent' (the message it was
+ * attached to went out; badge turns gray/read-only, chip no longer counts it).
+ *
+ * 持久化（Delivery_02 起）：每次 mutation 后按会话写 localStorage
+ * （`dsh-sidenote:annotations:v1:<sessionId>`），刷新/切会话后重建；
+ * 会话清空时删键。storage 不可用（测试/隐私模式）时退化为纯内存。
+ */
+export interface Annotation {
+  readonly externalCaptureId?: string
+  readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number; readonly anchor?: { exact: string; start: number; prefix: string; suffix: string } }
+  /** Store-unique identity (monotonic across sessions). */
+  readonly id: number
+  /** 本批显示及 <annotation id> 编号，发送时冻结。 */
+  readonly number: number
+  readonly sessionId: string
+  /** Source is independent of the send target. Missing fields revive legacy main quotes. */
+  readonly sourceSessionId?: string
+  readonly sourceSurface?: 'main' | 'side'
+  /** `data-chat-anchor-key` of the owning message (re-anchor key). */
+  readonly anchorKey: string | undefined
+  /** Full human-selected quote; chip truncation is visual only. */
+  readonly text: string
+  /** Full selection text (re-anchor needle; untruncated). */
+  readonly anchorText: string
+  /** 0-based ordinal of the quote's occurrence inside the anchor element. */
+  readonly occurrence: number
+  /** Cross-reply quotes retain one anchor per body; legacy quotes use the fields above. */
+  readonly anchors?: readonly AnnotationAnchor[]
+  /** User-written note; '' means 纯引用. */
+  readonly note: string
+  readonly state: 'active' | 'sent'
+  readonly createdAt: number
+}
+
+export type AnnotationAnchor = Pick<Annotation, 'anchorKey' | 'anchorText' | 'occurrence'>
+
+export interface AnnotationDraft {
+  readonly externalCaptureId?: string
+  readonly externalSource?: Annotation['externalSource']
+  readonly sessionId: string
+  readonly sourceSessionId?: string
+  readonly sourceSurface?: 'main' | 'side'
+  readonly anchorKey: string | undefined
+  readonly text: string
+  readonly anchorText: string
+  readonly occurrence: number
+  readonly anchors?: readonly AnnotationAnchor[]
+  readonly note: string
+}
+
+export interface AnnotationStore {
+  /** Monotonic version, referentially stable between mutations (uSES-ready). */
+  getSnapshot(): number
+  /** Memory contents remain usable after storage access/quota failures. */
+  getStorageStatus(sessionId?: string): 'persistent' | 'memory'
+  getSubmission(sessionId: string): { readonly pending: boolean; readonly error?: string }
+  setSubmission(sessionId: string, state: { pending: boolean; error?: string }): void
+  subscribe(fn: () => void): () => void
+  /** Create an active annotation; returns it (id/number assigned). */
+  add(draft: AnnotationDraft): Annotation
+  setNote(id: number, note: string): void
+  remove(id: number): void
+  /** 把指定 id 的 active 注释翻为 'sent'（发送拦截器只翻当时拼进消息的
+   *  那批——窗口内新增的注释不得误标，C2 P1-3）。冻结拼协议块时的编号，
+   *  使发送期间的重排不会改变已发送消息的显示编号。 */
+  markSent(ids: readonly number[], frozenNumbers?: ReadonlyMap<number, number>): void
+  get(id: number): Annotation | undefined
+  /** All annotations of a session in creation order (active + sent). */
+  list(sessionId: string): readonly Annotation[]
+  listActive(sessionId: string): readonly Annotation[]
+  countActive(sessionId: string): number
+  /** Sessions currently holding any annotation (draft-sync fan-out). */
+  sessions(): readonly string[]
+}
+
+/** localStorage 键前缀（按会话分键）。 */
+export const STORAGE_PREFIX = 'dsh-sidenote:annotations:v1:'
+
+/** 持久化条目的宽松校验（字段缺失/类型漂移 → 丢弃该条，不抛错）。 */
+function reviveStored(value: unknown): Annotation | null {
+  if (typeof value !== 'object' || value === null) return null
+  const a = value as Record<string, unknown>
+  if (typeof a.id !== 'number' || typeof a.number !== 'number') return null
+  if (typeof a.sessionId !== 'string' || a.sessionId === '') return null
+  if (typeof a.text !== 'string' || typeof a.anchorText !== 'string') return null
+  if (typeof a.occurrence !== 'number') return null
+  if (a.state !== 'active' && a.state !== 'sent') return null
+  if (a.anchors !== undefined) {
+    if (!Array.isArray(a.anchors) || a.anchors.length < 2) return null
+    for (const anchor of a.anchors) {
+      if (!anchor || typeof anchor.anchorKey !== 'string' || !anchor.anchorKey
+        || typeof anchor.anchorText !== 'string' || !anchor.anchorText.trim()
+        || !Number.isSafeInteger(anchor.occurrence) || anchor.occurrence < 0) return null
+    }
+  }
+  return {
+    id: a.id,
+    // 兼容预览版已发送记录的显示编号；待发送记录在水合后重排。
+    number: a.state === 'sent' && typeof a.localNumber === 'number' ? a.localNumber : a.number,
+    sessionId: a.sessionId,
+    sourceSessionId: typeof a.sourceSessionId === 'string' && a.sourceSessionId !== '' ? a.sourceSessionId : undefined,
+    sourceSurface: a.sourceSurface === 'main' || a.sourceSurface === 'side' ? a.sourceSurface : undefined,
+    anchorKey: typeof a.anchorKey === 'string' && a.anchorKey !== '' ? a.anchorKey : undefined,
+    text: a.text,
+    anchorText: a.anchorText,
+    occurrence: a.occurrence,
+    ...(a.anchors ? { anchors: a.anchors as AnnotationAnchor[] } : {}),
+    note: typeof a.note === 'string' ? a.note : '',
+    state: a.state,
+    createdAt: typeof a.createdAt === 'number' ? a.createdAt : 0,
+    ...(typeof a.externalCaptureId === 'string' ? { externalCaptureId: a.externalCaptureId } : {}),
+    ...(typeof (a.externalSource as Annotation['externalSource'])?.label === 'string' ? { externalSource: a.externalSource as Annotation['externalSource'] } : {}),
+  }
+}
+
+export function createAnnotationStore(
+  now: () => number = () => Date.now(),
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'> | null,
+): AnnotationStore {
+  let annotations: Annotation[] = []
+  let nextId = 1
+  let version = 0
+  const listeners = new Set<() => void>()
+  const submissions = new Map<string, { pending: boolean; error?: string }>()
+  const idleSubmission = { pending: false }
+
+  const countActiveOf = (sessionId: string): number =>
+    annotations.reduce((n, a) => n + (a.sessionId === sessionId && a.state === 'active' ? 1 : 0), 0)
+
+  /** 只重排目标会话的待发送编号，已发送编号保持冻结。 */
+  const renumberActive = (sessionId: string): void => {
+    const numbers = new Map<number, number>()
+    annotations
+      .filter(a => a.sessionId === sessionId && a.state === 'active')
+      .sort((left, right) => left.id - right.id)
+      .forEach((annotation, index) => { numbers.set(annotation.id, index + 1) })
+    annotations = annotations.map(a => {
+      const number = numbers.get(a.id)
+      return number === undefined || a.number === number ? a : { ...a, number }
+    })
+  }
+
+  // localStorage 默认取全局（浏览器环境）；显式传 null = 纯内存（测试）。
+  let store = storage ?? null
+  if (storage === undefined) {
+    try { store = globalThis.localStorage ?? null } catch { store = null }
+  }
+  let storageStatus: 'persistent' | 'memory' = store === null ? 'memory' : 'persistent'
+  const failedStorageSessions = new Set<string>()
+  let hydrationFailed = false
+
+  // 启动水合：恢复已发送编号，待发送记录重排。
+  if (store != null) {
+    try {
+      const keys: string[] = []
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i)
+        if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) keys.push(key)
+      }
+      for (const key of keys) {
+        const raw = store.getItem(key)
+        if (raw === null) continue
+        let parsed: unknown
+        try { parsed = JSON.parse(raw) } catch {
+          console.warn('[dsh-sidenote] 跳过损坏的注释记录:', key)
+          continue
+        }
+        if (!Array.isArray(parsed)) continue
+        for (const item of parsed) {
+          const revived = reviveStored(item)
+          if (revived === null) continue
+          annotations.push(revived)
+          nextId = Math.max(nextId, revived.id + 1)
+        }
+      }
+    } catch (error) {
+      hydrationFailed = true
+      storageStatus = 'memory'
+      console.warn('[dsh-sidenote] 注释持久化读取失败（按空起步）:', error)
+    }
+  }
+
+  /** 把一个会话的注释写回 localStorage（空则删键）。 */
+  const persistSession = (sessionId: string): void => {
+    if (store == null) return
+    try {
+      const items = annotations.filter(a => a.sessionId === sessionId)
+      const key = STORAGE_PREFIX + sessionId
+      if (items.length === 0) store.removeItem(key)
+      else store.setItem(key, JSON.stringify(items))
+      failedStorageSessions.delete(sessionId)
+      storageStatus = hydrationFailed || failedStorageSessions.size > 0 ? 'memory' : 'persistent'
+    } catch (error) {
+      failedStorageSessions.add(sessionId)
+      storageStatus = 'memory'
+      console.warn('[dsh-sidenote] 注释持久化写入失败:', error)
+    }
+  }
+
+  /** mutation 后落盘：受影响会话可能不止一个（markSessionSent 单会话）。 */
+  const persistTouched = (touched: readonly string[]): void => {
+    for (const sessionId of new Set(touched)) persistSession(sessionId)
+  }
+
+  const notify = (): void => {
+    version += 1
+    for (const fn of [...listeners]) fn()
+  }
+
+  // 旧记录的 active 编号重排，sent 沿用已有的冻结编号。
+  for (const sessionId of new Set(annotations.map(a => a.sessionId))) renumberActive(sessionId)
+
+  const replace = (id: number, patch: Partial<Annotation>): void => {
+    const target = annotations.find(a => a.id === id)
+    annotations = annotations.map(a => (a.id === id ? { ...a, ...patch } : a))
+    if (target !== undefined) persistTouched([target.sessionId])
+    notify()
+  }
+
+  return {
+    getSnapshot: () => version,
+    getStorageStatus: sessionId => sessionId === undefined || hydrationFailed || store === null
+      ? storageStatus : failedStorageSessions.has(sessionId) ? 'memory' : 'persistent',
+    getSubmission: sessionId => submissions.get(sessionId) ?? idleSubmission,
+    setSubmission(sessionId, state) { submissions.set(sessionId, state); notify() },
+    subscribe(fn: () => void): () => void {
+      listeners.add(fn)
+      return () => { listeners.delete(fn) }
+    },
+    add(draft: AnnotationDraft): Annotation {
+      const number = countActiveOf(draft.sessionId) + 1
+      const annotation: Annotation = {
+        id: nextId,
+        number,
+        sessionId: draft.sessionId,
+        sourceSessionId: draft.sourceSessionId,
+        sourceSurface: draft.sourceSurface,
+        externalSource: draft.externalSource,
+        externalCaptureId: draft.externalCaptureId,
+        anchorKey: draft.anchorKey,
+        text: draft.text,
+        anchorText: draft.anchorText,
+        occurrence: draft.occurrence,
+        ...(draft.anchors ? { anchors: draft.anchors } : {}),
+        note: draft.note,
+        state: 'active',
+        createdAt: now(),
+      }
+      nextId += 1
+      annotations = [...annotations, annotation]
+      persistTouched([draft.sessionId])
+      notify()
+      return annotation
+    },
+    setNote(id: number, note: string): void {
+      if (!annotations.some(a => a.id === id && a.note !== note && !(a.externalSource && a.state === 'sent'))) return
+      replace(id, { note })
+    },
+    remove(id: number): void {
+      const target = annotations.find(a => a.id === id)
+      if (target === undefined) return
+      annotations = annotations.filter(a => a.id !== id)
+      renumberActive(target.sessionId)
+      persistTouched([target.sessionId])
+      notify()
+    },
+    markSent(ids: readonly number[], frozenNumbers?: ReadonlyMap<number, number>): void {
+      if (ids.length === 0) return
+      const idSet = new Set(ids)
+      if (!annotations.some(a => idSet.has(a.id) && a.state === 'active')) return
+      const touched = new Set<string>()
+      annotations = annotations.map(a => {
+        if (!idSet.has(a.id) || a.state !== 'active') return a
+        touched.add(a.sessionId)
+        return { ...a, state: 'sent', number: frozenNumbers?.get(a.id) ?? a.number }
+      })
+      // 刚发送的这批编号就地冻结（保持此刻 1..k），剩余 active 重新紧凑排。
+      for (const sessionId of touched) renumberActive(sessionId)
+      persistTouched([...touched])
+      notify()
+    },
+    get(id: number): Annotation | undefined {
+      return annotations.find(a => a.id === id)
+    },
+    list(sessionId: string): readonly Annotation[] {
+      return annotations.filter(a => a.sessionId === sessionId)
+    },
+    listActive(sessionId: string): readonly Annotation[] {
+      return annotations.filter(a => a.sessionId === sessionId && a.state === 'active')
+    },
+    countActive(sessionId: string): number {
+      return countActiveOf(sessionId)
+    },
+    sessions(): readonly string[] {
+      return [...new Set(annotations.map(a => a.sessionId))]
+    },
+  }
+}

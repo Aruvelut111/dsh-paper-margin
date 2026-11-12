@@ -1,0 +1,4 @@
+# Add the reader only. Native file limits and other host settings stay owned by DSH.
+- insert:
+    - id: paper-margin
+      name: 'dsh-paper-margin'
