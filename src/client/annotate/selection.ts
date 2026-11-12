@@ -8,7 +8,7 @@
  */
 import { cleanSelection } from '../annotate/model'
 import { openInlineEditor } from './editor'
-import { readerSurfaceVisible, READER_VISIBILITY_ATTRIBUTES } from './reader-surface'
+import { readerSurfaceVisible, observeReaderVisibility } from './reader-surface'
 
 export interface SelectionCapture {
   pageAtPoint(x: number, y: number): number | null
@@ -107,14 +107,13 @@ export function attachSelectionCapture(
   button.addEventListener('mousedown', onButtonDown)
   const onKeyboardClick = (event: MouseEvent) => { if (event.detail === 0) onButtonDown(event) }
   button.addEventListener('click', onKeyboardClick)
-  const onScroll = () => { toolbar.style.display = 'none'; current = null }
+  const onScroll = () => { if (toolbar.style.display !== 'none') toolbar.style.display = 'none'; current = null }
   window.addEventListener('scroll', onScroll, true)
   document.addEventListener('keydown', onKey, true)
-  const visibility = new MutationObserver(() => { if (!readerSurfaceVisible(root)) onScroll() })
-  visibility.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: READER_VISIBILITY_ATTRIBUTES })
+  const stopVisibility = observeReaderVisibility(root, () => { if (!readerSurfaceVisible(root)) { onScroll(); closeEditor?.(); closeEditor = undefined } })
   return () => {
     closeEditor?.()
-    visibility.disconnect()
+    stopVisibility()
     document.removeEventListener('mouseup', onMouseUp, true)
     button.removeEventListener('mousedown', onButtonDown)
     button.removeEventListener('click', onKeyboardClick)

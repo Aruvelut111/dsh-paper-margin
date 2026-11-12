@@ -1,6 +1,6 @@
 import { openInlineEditor } from './editor'
 import { sourceInfo, type UniversalAnnotatorOptions } from './universal'
-import { readerSurfaceVisible } from './reader-surface'
+import { readerSurfaceVisible, observeReaderRoots } from './reader-surface'
 
 /** An explicit action leaves native pan, zoom, drag and context menus intact. */
 export function attachImageAnnotations(onAnnotate: UniversalAnnotatorOptions['onAnnotate']): () => void {
@@ -24,6 +24,6 @@ export function attachImageAnnotations(onAnnotate: UniversalAnnotatorOptions['on
       mounted.set(root, () => { close?.(); bar.remove() })
     }
   }
-  const observer = new MutationObserver(scan); observer.observe(document.body, { childList: true, subtree: true }); scan()
-  return () => { observer.disconnect(); for (const dispose of mounted.values()) dispose(); mounted.clear() }
+  const stopDiscovery = observeReaderRoots('[data-image-preview]', scan); scan()
+  return () => { stopDiscovery(); for (const dispose of mounted.values()) dispose(); mounted.clear() }
 }

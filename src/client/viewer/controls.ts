@@ -34,9 +34,13 @@ export function readerControls(view: ReaderControlView): { node: HTMLElement; re
   const find = el('button', { type: 'button', onClick: () => { void search() } }, '查找')
   const node = el('nav', { 'aria-label': 'PDF 阅读工具', 'data-paper-margin-reader-controls': '', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px', padding: '6px 10px', borderBottom: '1px solid #8883', fontSize: '12px' } }, previous, page, count, next, zoom, query, find, status)
   for (const field of node.querySelectorAll<HTMLElement>('button, input, select')) Object.assign(field.style, { color: 'inherit', background: 'var(--dsw-alias-bg-layer-2, transparent)', border: '1px solid var(--dsw-alias-border-l2, #8886)', borderRadius: '5px', padding: '4px 6px', font: 'inherit' })
+  let lastPage = -1; let lastCount = -1
   return { node, refresh() {
-    if (document.activeElement !== page) page.value = String(view.currentPage())
+    const current = view.currentPage()
+    if (current === lastPage && view.numPages === lastCount) return
+    lastPage = current; lastCount = view.numPages
+    if (document.activeElement !== page) page.value = String(current)
     page.max = String(view.numPages); count.textContent = `/ ${view.numPages}`
-    previous.disabled = view.currentPage() <= 1; next.disabled = view.currentPage() >= view.numPages
+    previous.disabled = current <= 1; next.disabled = current >= view.numPages
   }, dispose() { disposed = true; node.remove() } }
 }

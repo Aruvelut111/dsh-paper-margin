@@ -34,7 +34,7 @@ const SOURCE_SELECTORS: ReadonlyArray<{ selector: string; kind: string }> = [
 
 import { openInlineEditor } from './editor'
 import { captureTextAnchor, type TextAnchor } from './text-anchor'
-import { readerSessionId, readerSurfaceVisible, READER_VISIBILITY_ATTRIBUTES } from './reader-surface'
+import { readerSessionId, readerSurfaceVisible, observeReaderVisibility } from './reader-surface'
 
 export interface CapturedSelection {
   anchor?: TextAnchor
@@ -141,11 +141,13 @@ export function attachUniversalAnnotator(options: UniversalAnnotatorOptions): ()
   let pending: CapturedSelection | null = null
   let pendingSurface: Element | undefined
   let closeEditor: (() => void) | undefined
+  let stopVisibility: (() => void) | undefined
 
   const hide = (): void => {
-    toolbar.style.display = 'none'
+    if (toolbar.style.display !== 'none') toolbar.style.display = 'none'
     pending = null
     pendingSurface = undefined
+    stopVisibility?.(); stopVisibility = undefined
   }
 
   /** Walk up from the selection to the nearest known surface container. */
@@ -223,6 +225,10 @@ export function attachUniversalAnnotator(options: UniversalAnnotatorOptions): ()
       }
       toolbar.style.display = 'block'
       pendingSurface = surface.element
+      stopVisibility?.()
+      stopVisibility = observeReaderVisibility(surface.element, () => {
+        if (!readerSurfaceVisible(surface.element) || readerSessionId(surface.element) !== pending?.sessionId) hide()
+      })
       // Keep the toolbar fully on screen without covering the selection.
       const maxLeft = window.innerWidth - toolbar.offsetWidth - 8
       const below = rect.bottom + 6
@@ -272,12 +278,10 @@ export function attachUniversalAnnotator(options: UniversalAnnotatorOptions): ()
   button.addEventListener('click', onKeyboardClick)
   document.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('scroll', onScroll, true)
-  const visibility = new MutationObserver(() => { if (pendingSurface && (!readerSurfaceVisible(pendingSurface) || readerSessionId(pendingSurface) !== pending?.sessionId)) hide() })
-  visibility.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: READER_VISIBILITY_ATTRIBUTES })
 
   return () => {
     closeEditor?.()
-    visibility.disconnect()
+    stopVisibility?.()
     document.removeEventListener('mouseup', onMouseUp, true)
     document.removeEventListener('keyup', onKeyboardSelection, true)
     button.removeEventListener('mousedown', onButtonDown)

@@ -5,10 +5,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$release = 'https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5'
+$release = 'https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6'
 $packages = @(
-    @{ Name = 'dsh-paper-margin-2.5.5.tgz'; Sha256 = '6b6bffc05edd5912de73ca12fb877282645badb9f541805e3adb9a92ffc6b1ad' },
-    @{ Name = 'dsh-sidenote-0.8.5-reader.3.tgz'; Sha256 = '9cbfb4c2641baa376b40920d21a1e8bb2dd45af9f70f6e72a06551affac58a43' }
+    @{ Name = 'dsh-paper-margin-2.5.6.tgz'; Sha256 = '5ea496be7240e0031a758df7e653e9d3bf53f9c70916dbc8d61b833554a74be6' },
+    @{ Name = 'dsh-sidenote-0.8.5-reader.4.tgz'; Sha256 = '7a86c6e4557788fd7724d9d19a54c42fd04d947936c6dd95b35051ea14e6a4ef' }
 )
 
 if (-not $DshPath -and $Profile -eq 'desktop') {
@@ -44,7 +44,7 @@ try {
     }
     & $DshPath plugin --profile $Profile add @downloaded --ignore-scripts --save-exact
     if ($LASTEXITCODE -ne 0) { throw ('DSH installation failed with exit code ' + $LASTEXITCODE) }
-    Write-Host ('Installed Paper Margin 2.5.5 and sidenote 0.8.5-reader.3 in profile ' + $Profile + '. Restart DSH to load them.')
+    Write-Host ('Installed Paper Margin 2.5.6 and sidenote 0.8.5-reader.4 in profile ' + $Profile + '. Restart DSH to load them.')
 } finally {
     foreach ($file in $downloaded) {
         if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }

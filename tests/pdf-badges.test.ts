@@ -19,6 +19,8 @@ it('restores saved PDF marks after page replacement and removes all projections 
     expect(root.querySelector('[data-paper-margin-badge]')?.getAttribute('title')).toContain('kept')
     expect((root.querySelector('[data-paper-margin-badge]') as HTMLElement).style.background).toBe('rgb(47, 136, 255)')
     expect((root.querySelector('[data-paper-margin-saved-mark]') as HTMLElement).style.background).toBe('rgba(47, 136, 255, 0.18)')
+    expect(locate).toHaveBeenCalledTimes(1)
+    expect(locate).toHaveBeenCalledWith('quote', 2, true)
     state = 'sent'; document.dispatchEvent(new Event('dsh-sidenote:external-annotations-changed'))
     await vi.waitFor(() => expect(root.querySelector('[data-paper-margin-badge], [data-paper-margin-saved-mark]')).toBeNull())
   } finally { stop(); document.removeEventListener('dsh-sidenote:external-annotation:v1', receive); vi.unstubAllGlobals() }

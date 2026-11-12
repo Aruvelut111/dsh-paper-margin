@@ -16,6 +16,7 @@ import * as pdfjs from 'pdfjs-dist'
 import { boxesFor, findInItems, searchOrder, type FractionBox, type TextItem } from '../protocol/textsearch'
 import { HostRangeTransport, type ByteSource } from './byte-source'
 import { readerControls } from './controls'
+import { pacedTextStream } from './text-stream'
 
 /** undefined: not created yet; null: no worker (tests fall back to fake worker). */
 let sharedWorker: pdfjs.PDFWorker | null | undefined
@@ -39,8 +40,8 @@ function getWorker(): pdfjs.PDFWorker | null {
 }
 
 const GAP = 14
-const KEEP = 6
-const MAX_CANVAS_PIXELS = 16_777_216
+const KEEP = 1
+const MAX_CANVAS_PIXELS = 4_194_304
 
 export function openPdfView(
   container: HTMLElement,
@@ -73,6 +74,21 @@ export class PdfViewImpl {
   private generation = 0
   private readonly pendingFlashes = new Map<number, readonly FractionBox[]>()
   private readonly renders = new Set<pdfjs.RenderTask>()
+  private readonly textLayers = new Map<number, pdfjs.TextLayer>()
+  private dragging = false
+  private resumeFrame = 0
+  private readonly continuations = new Set<() => void>()
+  private readonly pointerDown = () => { this.dragging = true }
+  private readonly pointerUp = () => {
+    this.dragging = false
+    if (this.resumeFrame) return
+    this.resumeFrame = requestAnimationFrame(() => {
+      this.resumeFrame = 0
+      for (const resume of this.continuations) resume()
+      this.continuations.clear()
+      this.pump()
+    })
+  }
   tops: number[] = []
   sizes: ({ w: number; h: number } | null)[] = []
   scale = 1
@@ -110,6 +126,10 @@ export class PdfViewImpl {
       })
     }
     this.scroller.addEventListener('scroll', this.onScroll, { passive: true })
+    this.scroller.addEventListener('pointerdown', this.pointerDown, { passive: true })
+    window.addEventListener('pointerup', this.pointerUp)
+    window.addEventListener('pointercancel', this.pointerUp)
+    window.addEventListener('blur', this.pointerUp)
 
     this.ready = this.load({ bytes, source })
     this.ready.catch(() => undefined)
@@ -164,6 +184,8 @@ export class PdfViewImpl {
     const generation = ++this.generation
     const readingPage = this.currentPage()
     for (const render of this.renders) render.cancel()
+    for (const layer of this.textLayers.values()) layer.cancel()
+    this.textLayers.clear()
     for (const slot of this.pages) slot?.remove()
     this.pages.fill(null)
     let offset = 0
@@ -195,10 +217,10 @@ export class PdfViewImpl {
 
   /** Find quoted words: hinted page first, then neighbours, then the rest.
    * Works on pdf.js text content, so undrawn pages count. */
-  async locate(quote: string, hint?: number): Promise<{ page: number; boxes: FractionBox[] } | null> {
+  async locate(quote: string, hint?: number, pageOnly = false): Promise<{ page: number; boxes: FractionBox[] } | null> {
     if (this.doc === undefined || quote === '') return null
     this.textCache ??= new Map()
-    for (const n of searchOrder(this.numPages, hint).slice(0, 32)) {
+    for (const n of (pageOnly && hint ? [hint] : searchOrder(this.numPages, hint).slice(0, 32))) {
       if (this.disposed) return null
       let entry = this.textCache.get(n)
       if (entry === undefined) {
@@ -217,6 +239,7 @@ export class PdfViewImpl {
           },
         }
         this.textCache.set(n, entry)
+        if (this.textCache.size > 12) this.textCache.delete(this.textCache.keys().next().value!)
       }
       const spans = findInItems(entry.items, quote)
       if (spans !== null) return { page: n, boxes: boxesFor(spans, entry.items, entry.viewport) }
@@ -277,19 +300,24 @@ export class PdfViewImpl {
     const viewBottom = scrollTop + this.scroller.clientHeight
     const current = this.pageAt(viewTop + (viewBottom - viewTop) / 2)
     const wanted: number[] = []
-    for (let p = Math.max(1, current - KEEP); p <= Math.min(this.numPages, current + KEEP); p++) wanted.push(p)
+    const first = Math.max(1, this.pageAt(viewTop) - KEEP)
+    const last = Math.min(this.numPages, this.pageAt(viewBottom) + KEEP)
+    for (let p = first; p <= last; p++) if (this.pages[p - 1] === null) wanted.push(p)
     wanted.sort((a, b) => Math.abs(a - current) - Math.abs(b - current))
     this.queue = wanted
+    this.freeDistant()
     this.pump()
   }
 
   pageAt(y: number): number {
-    for (let i = 0; i < this.numPages; i++) {
-      const size = this.sizes[i]
-      if (size === null || size === undefined) continue
-      if (y >= this.tops[i]! && y < this.tops[i]! + size.h + GAP) return i + 1
+    if (this.totalHeight === 0 || this.numPages === 0) return 1
+    let low = 0; let high = this.numPages - 1
+    while (low <= high) {
+      const middle = (low + high) >>> 1
+      if (this.tops[middle]! <= y) low = middle + 1
+      else high = middle - 1
     }
-    return y >= this.totalHeight ? this.numPages : 1
+    return Math.max(1, Math.min(this.numPages, high + 1))
   }
 
   /** Page number under a viewport point, for the selection toolbar. */
@@ -322,7 +350,7 @@ export class PdfViewImpl {
   }
 
   pump() {
-    if (this.active !== null || this.disposed) return
+    if (this.active !== null || this.disposed || this.dragging) return
     const page = this.queue.shift()
     if (page === undefined) return
     this.active = page
@@ -378,15 +406,27 @@ export class PdfViewImpl {
     const context = canvas.getContext('2d')
     if (context === null) return
     const render = page.render({ canvasContext: context, viewport: raster }); this.renders.add(render)
+    // PDF.js exposes the same cooperative pause used by its native viewer.
+    // Do not spend the next canvas slice while the user is dragging a range.
+    render.onContinue = (resume: () => void) => {
+      if (this.dragging) this.continuations.add(resume)
+      else requestAnimationFrame(() => {
+        if (this.disposed) return
+        if (this.dragging) this.continuations.add(resume)
+        else resume()
+      })
+    }
     try { await render.promise } finally { this.renders.delete(render) }
     if (this.disposed) return
     // Text layer after the image, in idle time (cite-lens discipline).
-    const idle = typeof requestIdleCallback === 'function'
-      ? (fn: () => void) => requestIdleCallback(() => fn(), { timeout: 250 })
-      : (fn: () => void) => setTimeout(fn, 16)
-    idle(() => { void (async () => {
+    await new Promise<void>(resolve => {
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(() => resolve(), { timeout: 250 })
+      else setTimeout(resolve, 16)
+    })
+    if (this.dragging) await new Promise<void>(resolve => { this.continuations.add(resolve) })
+    if (!this.disposed) {
       if (this.disposed || this.pages[number - 1] !== slot) return
-      const textContent = await page.getTextContent()
+      const textContent = pacedTextStream(page.streamTextContent(), () => this.dragging, () => this.disposed || this.pages[number - 1] !== slot)
       if (this.disposed || this.pages[number - 1] !== slot) return
       // pdf.js builds selectable spans inside a *dedicated* .textLayer div that
       // sits absolutely over the canvas. Handing it the page element directly
@@ -399,24 +439,34 @@ export class PdfViewImpl {
       textLayerDiv.style.setProperty('--total-scale-factor', String(this.scale))
       slot.appendChild(textLayerDiv)
       const layer = new pdfjs.TextLayer({ textContentSource: textContent, container: textLayerDiv, viewport })
-      await layer.render()
+      this.textLayers.set(number, layer)
+      try { await layer.render() } catch (error) {
+        if (this.disposed || generation !== this.generation || this.pages[number - 1] !== slot) return
+        throw error
+      } finally { if (this.textLayers.get(number) === layer) this.textLayers.delete(number) }
       if (this.disposed || this.pages[number - 1] !== slot) {
         textLayerDiv.remove()
         return
       }
       slot.setAttribute('data-paper-margin-text', '')
-    })().catch(error => { if (!this.disposed) this.showFailure(error) }) })
+    }
     this.freeDistant()
   }
 
   freeDistant(): void {
-    const current = this.pageAt(this.scroller.scrollTop + this.scroller.clientHeight / 2)
+    if (this.dragging) return
+    const first = Math.max(1, this.pageAt(this.scroller.scrollTop) - KEEP - 1)
+    const last = Math.min(this.numPages, this.pageAt(this.scroller.scrollTop + this.scroller.clientHeight) + KEEP + 1)
     for (let p = 1; p <= this.numPages; p++) {
-      if (Math.abs(p - current) <= KEEP + 2) continue
+      if (p >= first && p <= last) continue
       const slot = this.pages[p - 1]
       if (slot !== null && slot !== undefined) {
+        if (p === this.active) for (const render of this.renders) render.cancel()
+        this.textLayers.get(p)?.cancel(); this.textLayers.delete(p)
+        for (const canvas of slot.querySelectorAll('canvas')) { canvas.width = 0; canvas.height = 0 }
         slot.remove()
         this.pages[p - 1] = null
+        void this.doc?.getPage(p).then(page => { if (this.pages[p - 1] === null) page.cleanup() }).catch(() => undefined)
       }
     }
   }
@@ -427,9 +477,18 @@ export class PdfViewImpl {
     this.resizeObserver?.disconnect()
     this.controls.dispose()
     for (const render of this.renders) render.cancel()
+    for (const layer of this.textLayers.values()) layer.cancel()
+    this.textLayers.clear()
+    for (const resume of this.continuations) resume()
+    this.continuations.clear()
+    if (this.resumeFrame) cancelAnimationFrame(this.resumeFrame)
     if (this.frame) cancelAnimationFrame(this.frame)
     this.transport?.dispose()
     this.scroller.removeEventListener('scroll', this.onScroll)
+    this.scroller.removeEventListener('pointerdown', this.pointerDown)
+    window.removeEventListener('pointerup', this.pointerUp)
+    window.removeEventListener('pointercancel', this.pointerUp)
+    window.removeEventListener('blur', this.pointerUp)
     void this.task?.destroy().catch(() => undefined)
     this.scroller.remove()
   }

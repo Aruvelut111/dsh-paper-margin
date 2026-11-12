@@ -17,7 +17,7 @@ Supports DSH 0.2.2; tested with 0.2.2-rc.1.
 On Windows, quit DSH and run in PowerShell:
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/install.ps1 | iex
 ```
 
 The [installer](scripts/install.ps1) locates DSH, downloads and verifies both packages, and calls the official plugin command. Restart DSH afterward.
@@ -25,18 +25,18 @@ The [installer](scripts/install.ps1) locates DSH, downloads and verifies both pa
 With `dsh` on PATH, install directly from the release URLs:
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-paper-margin-2.5.5.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-paper-margin-2.5.6.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
 ```
 
-For Web, replace `desktop` with `web`. To install manually, download both tarballs from [v2.5.5](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.5) and add them through DSH Plugins:
+For Web, replace `desktop` with `web`. To install manually, download both tarballs from [v2.5.6](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.6) and add them through DSH Plugins:
 
-- `dsh-paper-margin-2.5.5.tgz`
-- `dsh-sidenote-0.8.5-reader.3.tgz`
+- `dsh-paper-margin-2.5.6.tgz`
+- `dsh-sidenote-0.8.5-reader.4.tgz`
 
 The paired sidenote package replaces an existing package of the same name. It adds the reader bridge to [g-yixuan/dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote); source and history are preserved in the [reader fork](https://github.com/Aruvelut111/dsh-sidenote/tree/fix/external-reader-annotations).
 
 ```sh
-dsh plugin --profile desktop add ./dsh-paper-margin-2.5.5.tgz ./dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add ./dsh-paper-margin-2.5.6.tgz ./dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
 ```
 
 ## Formats

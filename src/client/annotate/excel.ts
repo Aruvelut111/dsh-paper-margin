@@ -1,6 +1,6 @@
 import { openInlineEditor } from './editor'
 import { sourceInfo, type CapturedSelection, type UniversalAnnotatorOptions } from './universal'
-import { readerSessionId, readerSurfaceVisible } from './reader-surface'
+import { readerSessionId, readerSurfaceVisible, observeReaderRoots } from './reader-surface'
 
 /** Use FortuneSheet's native copy projection; never inspect React internals or read the system clipboard. */
 export function selectedExcelText(root: HTMLElement): string | undefined {
@@ -59,6 +59,6 @@ export function attachExcelAnnotations(onAnnotate: UniversalAnnotatorOptions['on
       roots.set(root, { bar, dispose: () => { clearTimeout(timer); close?.(); bar.remove() } })
     }
   }
-  const observer = new MutationObserver(scan); observer.observe(document.body, { childList: true, subtree: true }); scan()
-  return () => { stopped = true; observer.disconnect(); for (const state of roots.values()) state.dispose(); roots.clear() }
+  const stopDiscovery = observeReaderRoots('[data-excel-preview]', scan); scan()
+  return () => { stopped = true; stopDiscovery(); for (const state of roots.values()) state.dispose(); roots.clear() }
 }

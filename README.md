@@ -22,7 +22,7 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/install.ps1 | iex
 ```
 
 脚本自动找到 DSH、下载并校验两个安装包，再调用官方插件安装命令。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
@@ -30,24 +30,24 @@ irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/ins
 已有 `dsh` 命令的终端可直接安装，无需手动下载：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-paper-margin-2.5.5.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.5/dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-paper-margin-2.5.6.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.6/dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
 ```
 
 Web 版将 `desktop` 改成 `web`。
 
 ### 手动安装
 
-从 [v2.5.5 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.5) 下载两个文件：
+从 [v2.5.6 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.6) 下载两个文件：
 
-- `dsh-paper-margin-2.5.5.tgz`
-- `dsh-sidenote-0.8.5-reader.3.tgz`
+- `dsh-paper-margin-2.5.6.tgz`
+- `dsh-sidenote-0.8.5-reader.4.tgz`
 
 在 DSH 的「插件 → 添加插件」中安装这两个包，然后重启。已有 sidenote 时，配套包替换同名插件，保留原有侧聊和本地注释。它是基于 [g-yixuan/dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的阅读集成分支，源码在 [Aruvelut111/dsh-sidenote](https://github.com/Aruvelut111/dsh-sidenote/tree/fix/external-reader-annotations)。
 
 CLI 也可以安装；文件路径按下载位置填写：
 
 ```sh
-dsh plugin --profile desktop add ./dsh-paper-margin-2.5.5.tgz ./dsh-sidenote-0.8.5-reader.3.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add ./dsh-paper-margin-2.5.6.tgz ./dsh-sidenote-0.8.5-reader.4.tgz --ignore-scripts --save-exact
 ```
 
 ## 文件支持

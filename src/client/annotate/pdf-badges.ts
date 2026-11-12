@@ -6,6 +6,7 @@ const EVENT = 'dsh-sidenote:external-annotation:v1'
 /** Small reader adapter: sidenote remains the sole owner of saved annotations. */
 export function attachPdfBadges(root: HTMLElement, view: PdfViewImpl, address: string, sessionId: string): () => void {
   let stopped = false; let frame = 0; let generation = 0
+  const geometry = new Map<number, { text: string; page: number; found: Awaited<ReturnType<PdfViewImpl['locate']>> }>()
   const list = (): ExternalNote[] => {
     sessionId = readerSessionId(root) ?? sessionId
     let items: ExternalNote[] = []
@@ -20,7 +21,12 @@ export function attachPdfBadges(root: HTMLElement, view: PdfViewImpl, address: s
       const number = item.externalSource!.page!
       const page = root.querySelector<HTMLElement>('[data-paper-margin-page="' + number + '"]')
       if (!page || page.querySelector('[data-paper-margin-badge="' + item.id + '"]')) continue
-      const found = await view.locate(item.anchorText, number)
+      let cached = geometry.get(item.id)
+      if (!cached || cached.text !== item.anchorText || cached.page !== number) {
+        const found = await view.locate(item.anchorText, number, true)
+        cached = { text: item.anchorText, page: number, found }; geometry.set(item.id, cached)
+      }
+      const found = cached.found
       if (stopped || generation !== run || !page.isConnected) return
       if (found?.page !== number) continue
       for (const box of found.boxes) {
@@ -38,8 +44,8 @@ export function attachPdfBadges(root: HTMLElement, view: PdfViewImpl, address: s
     }
   }
   const schedule = () => { if (!stopped && !frame) frame = requestAnimationFrame(() => { void draw().catch(() => undefined) }) }
-  const changed = () => { generation++; for (const badge of root.querySelectorAll('[data-paper-margin-badge], [data-paper-margin-saved-mark]')) badge.remove(); schedule() }
+  const changed = () => { generation++; const ids = new Set(list().map(item => item.id)); for (const id of geometry.keys()) if (!ids.has(id)) geometry.delete(id); for (const badge of root.querySelectorAll('[data-paper-margin-badge], [data-paper-margin-saved-mark]')) badge.remove(); schedule() }
   const observer = new MutationObserver(records => { if (records.some(record => [...record.addedNodes].some(node => node instanceof HTMLElement && (node.hasAttribute('data-paper-margin-page') || node.classList.contains('textLayer'))))) schedule() })
   observer.observe(root, { childList: true, subtree: true }); document.addEventListener('dsh-sidenote:external-annotations-changed', changed); schedule()
-  return () => { stopped = true; generation++; if (frame) cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('dsh-sidenote:external-annotations-changed', changed); for (const badge of root.querySelectorAll('[data-paper-margin-badge], [data-paper-margin-saved-mark]')) badge.remove() }
+  return () => { stopped = true; generation++; geometry.clear(); if (frame) cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('dsh-sidenote:external-annotations-changed', changed); for (const badge of root.querySelectorAll('[data-paper-margin-badge], [data-paper-margin-saved-mark]')) badge.remove() }
 }

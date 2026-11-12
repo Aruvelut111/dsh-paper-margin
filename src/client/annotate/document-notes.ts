@@ -1,4 +1,4 @@
-import { resolveTextAnchor, type TextAnchor } from './text-anchor'
+import { documentText, resolveTextAnchor, type TextAnchor } from './text-anchor'
 import { readerSurfaceVisible, READER_VISIBILITY_ATTRIBUTES } from './reader-surface'
 /** Reader projections never create a second store. Numbers belong to sidenote. */
 export interface DocumentNote { id: number; number: number; anchorText: string; note: string; state: string; externalSource?: { address?: string; page?: number; anchor?: TextAnchor } }
@@ -45,16 +45,27 @@ export function attachDocumentNotes(): () => void {
   let focusedText = ''
   const draw = () => {
     frame = 0
+    // Measure every range before writing overlay styles; otherwise each note
+    // forces a separate browser layout during scrolling.
+    const plans: { state: State; visible: boolean; entries: { entry: Entry; rects: DOMRect[]; clip: ReturnType<typeof clippedBounds> }[] }[] = []
     for (const [root, state] of mounted) {
       const surfaceVisible = readerSurfaceVisible(root)
+      const clips = new Map<Element, ReturnType<typeof clippedBounds>>()
+      const entries = state.entries.filter(entry => entry.range).map(entry => {
+        const parent = entry.range!.startContainer.parentElement ?? root
+        let clip = clips.get(parent)
+        if (!clip) { clip = clippedBounds(root, parent); clips.set(parent, clip) }
+        const rects = surfaceVisible && typeof entry.range!.getClientRects === 'function' ? [...entry.range!.getClientRects()] : []
+        return { entry, rects, clip }
+      })
+      plans.push({ state, visible: surfaceVisible, entries })
+    }
+    for (const { state, visible: surfaceVisible, entries } of plans) {
       state.bar.style.display = surfaceVisible ? 'flex' : 'none'
       state.layer.style.display = surfaceVisible ? '' : 'none'
       let previous = -24
-      for (const entry of state.entries) {
-        if (!entry.range) continue
-        const clip = clippedBounds(root, entry.range.startContainer.parentElement ?? root)
-        const visible = surfaceVisible && clip.right - clip.left > 24 && clip.bottom - clip.top > 20 && root.getClientRects().length > 0
-        const rects = typeof entry.range.getClientRects === 'function' ? [...entry.range.getClientRects()] : []
+      for (const { entry, clip, rects } of entries) {
+        const visible = surfaceVisible && clip.right - clip.left > 24 && clip.bottom - clip.top > 20
         const rect = rects.find(r => r.bottom > clip.top && r.top < clip.bottom && r.right > clip.left && r.left < clip.right)
         entry.button.style.display = visible && rect ? 'block' : 'none'
         if (visible && rect) {
@@ -62,14 +73,15 @@ export function attachDocumentNotes(): () => void {
           entry.button.style.top = `${top}px`; entry.button.style.left = `${clip.right - 23}px`
           entry.button.style.display = top + 20 <= clip.bottom ? 'block' : 'none'; previous = top
         }
-        for (const mark of entry.marks) mark.remove(); entry.marks = []
-        if (!visible) continue
-        for (const box of rects) {
+        let index = 0
+        for (const box of visible ? rects : []) {
           const left = Math.max(box.left, clip.left); const top = Math.max(box.top, clip.top); const right = Math.min(box.right, clip.right); const bottom = Math.min(box.bottom, clip.bottom)
           if (right <= left || bottom <= top) continue
-          const mark = document.createElement('span'); mark.style.cssText = `position:fixed;pointer-events:none;left:${left}px;top:${top}px;width:${right - left}px;height:${bottom - top}px;background:rgba(47,136,255,${focusedText === entry.range.toString() ? '.3' : '.14'});border-bottom:1px solid #2f88ff66`
-          state.layer.append(mark); entry.marks.push(mark)
+          let mark = entry.marks[index++]
+          if (!mark) { mark = document.createElement('span'); state.layer.append(mark); entry.marks.push(mark) }
+          mark.style.cssText = `position:fixed;pointer-events:none;left:${left}px;top:${top}px;width:${right - left}px;height:${bottom - top}px;background:rgba(47,136,255,${focusedText === (entry.item.externalSource?.anchor?.exact || entry.item.anchorText) ? '.3' : '.14'});border-bottom:1px solid #2f88ff66`
         }
+        for (const mark of entry.marks.splice(index)) mark.remove()
       }
     }
   }
@@ -93,13 +105,16 @@ export function attachDocumentNotes(): () => void {
         state = { bar, layer, entries: [], signature: '', dispose: () => { bar.remove(); layer.remove() } }; mounted.set(root, state); resize?.observe(root)
       }
       if (!state) continue
-      const signature = JSON.stringify([sessionId, items, root.textContent])
+      // Build one text projection for all notes in this document, not one full
+      // TreeWalker pass per note on every text mutation.
+      const projection = documentText(root)
+      const signature = JSON.stringify([sessionId, items, projection.text])
       if (signature === state.signature && state.entries.every(entry => !entry.range || entry.range.startContainer.isConnected && entry.range.toString() === (entry.item.externalSource?.anchor?.exact || entry.item.anchorText))) continue
       state.signature = signature; state.entries = []; state.bar.replaceChildren(); state.layer.replaceChildren()
       state.bar.style.display = items.length ? 'flex' : 'none'
       const label = document.createElement('span'); label.textContent = `本文批注 ${items.length}`; state.bar.append(label)
       for (const item of items) {
-        const range = resolveTextAnchor(root, item.anchorText, item.externalSource?.anchor)
+        const range = resolveTextAnchor(root, item.anchorText, item.externalSource?.anchor, projection)
         const button = badge(item)
         const entry: Entry = { item, range, button, marks: [] }; state.entries.push(entry)
         const reopen = (origin: HTMLElement) => {
@@ -116,9 +131,15 @@ export function attachDocumentNotes(): () => void {
   }
   const schedule = () => { if (!queued && !stopped) { queued = true; queueMicrotask(scan) } }
   const observer = new MutationObserver(records => {
-    const relevant = records.filter(record => !(record.target instanceof Element ? record.target : record.target.parentElement)?.closest('[data-paper-margin-document-notes],[data-paper-margin-document-overlay]'))
+    const relevant = records.filter(record => {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement
+      if (target?.closest('[data-paper-margin],[data-paper-margin-document-notes],[data-paper-margin-document-overlay]')) return false
+      if (record.type === 'attributes') return [...mounted.keys()].some(root => target?.contains(root)) || record.attributeName === 'data-textpreview-url'
+      if (target?.closest('[data-textpreview-url]')) return true
+      return [...record.addedNodes, ...record.removedNodes].some(node => node instanceof Element && (node.matches('[data-textpreview-url]') || node.querySelector('[data-textpreview-url]')))
+    })
     if (relevant.some(record => record.type !== 'attributes' || record.attributeName === 'data-textpreview-url' || record.attributeName === 'data-sidebar-right-session')) schedule()
-    if (relevant.length) layout()
+    if (relevant.length && mounted.size) layout()
   })
   observer.observe(document.body, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['data-textpreview-url', ...READER_VISIBILITY_ATTRIBUTES] })
   const focus = (event: Event) => { focusedText = (event as CustomEvent<{ range: Range }>).detail.range.toString(); clearTimeout(focusTimer); focusTimer = setTimeout(() => { focusedText = ''; layout() }, 1800); layout() }

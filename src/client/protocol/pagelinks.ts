@@ -174,7 +174,8 @@ export function installPageLinks(
     }
   }
 
-  const rescanObserver = new MutationObserver(() => {
+  const rescanObserver = new MutationObserver(records => {
+    if (records.every(record => (record.target instanceof Element ? record.target : record.target.parentElement)?.closest('[data-textpreview-url],[data-paper-margin],[data-dsh-sidenote]'))) return
     if (settleTimer !== undefined) clearTimeout(settleTimer)
     settleTimer = setTimeout(rescan, 200)
   })

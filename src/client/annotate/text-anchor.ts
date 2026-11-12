@@ -23,8 +23,8 @@ export function captureTextAnchor(root: Element, range: Range): TextAnchor | und
   return { exact: text.slice(start, end), start, prefix: text.slice(Math.max(0, start - 48), start), suffix: text.slice(end, end + 48) }
 }
 /** Prefer a unique context match; stale offsets never disambiguate duplicates. */
-export function resolveTextAnchor(root: Element, quote: string, anchor?: TextAnchor): Range | undefined {
-  const { text, nodes } = documentText(root)
+export function resolveTextAnchor(root: Element, quote: string, anchor?: TextAnchor, projection = documentText(root)): Range | undefined {
+  const { text, nodes } = projection
   const exact = anchor?.exact || quote
   if (!exact.trim()) return
   const matches: number[] = []
