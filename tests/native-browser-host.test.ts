@@ -86,7 +86,7 @@ it('uses official authenticated Fetch routes and obtains session identity from t
   // DSH output uses JSON Schema, not the input value-spec's type: 'json'.
   expect(tool!.output.schema).toEqual({ type: 'object', additionalProperties: true })
   await expect(tool!.execute({ action: 'list', sessionId: 'main' }, {})).rejects.toThrow('initiating conversation')
-  expect(await tool!.execute({ action: 'list' }, { agent: { session: { id: 'main' } } })).toEqual({ pages: [] })
+  expect(await tool!.execute({ action: 'list' }, { agent: { session: { id: 'main' } } })).toEqual({ pages: [], resources: [] })
   const malformed = new Request('http://localhost' + routes[0]!.path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"pages":[]}' })
   expect((await routes[0]!.fetch(malformed)).status).toBe(400)
   dispose()

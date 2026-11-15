@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { NativePage, PageCommand, PageOutcome, PageRead } from '../browser-contract'
+import type { NativePage, PageCommand, PageOutcome, PageRead, SidebarResource } from '../browser-contract'
 import { pageFailure } from '../browser-contract'
 
 interface Client {
   pages: NativePage[]
+  resources: SidebarResource[]
   seen: number
   waiter?: { resolve(commands: PageCommand[]): void }
 }
@@ -23,6 +24,11 @@ export class NativePageBridge {
     this.prune()
     return [...this.clients.values()].flatMap(client => client.pages.filter(page => page.sessionId === sessionId))
   }
+  resources(sessionId: string): (SidebarResource & { windowId: string })[] {
+    this.prune()
+    return [...this.clients].flatMap(([windowId, client]) => client.resources
+      .filter(item => item.sessionId === sessionId).map(item => ({ ...item, windowId })))
+  }
   private prune(): void {
     for (const [id, client] of this.clients) if (Date.now() - client.seen > 45_000) {
       client.waiter?.resolve([])
@@ -30,13 +36,13 @@ export class NativePageBridge {
       for (const pending of [...this.pending.values()]) if (pending.clientId === id) pending.resolve(pageFailure('CLIENT_DISCONNECTED', 'The DSH window is no longer connected.'))
     }
   }
-  poll(clientId: string, pages: NativePage[], signal: AbortSignal): Promise<PageCommand[]> {
+  poll(clientId: string, pages: NativePage[], signal: AbortSignal, resources: SidebarResource[] = []): Promise<PageCommand[]> {
     if (this.disposed || signal.aborted) return Promise.resolve([])
     this.prune()
     const previous = this.clients.get(clientId)
     previous?.waiter?.resolve([])
     if (!previous && this.clients.size >= 16) throw new Error('Too many page-reader windows')
-    const client: Client = { pages, seen: Date.now() }
+    const client: Client = { pages, resources, seen: Date.now() }
     this.clients.set(clientId, client)
     for (const pending of [...this.pending.values()]) if (pending.clientId === clientId
       && !pages.some(page => page.id === pending.page.id && page.sessionId === pending.page.sessionId && page.url === pending.page.url)) {

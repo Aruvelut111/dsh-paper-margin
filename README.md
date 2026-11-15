@@ -23,7 +23,7 @@
 
 发送的是选区、评论和来源信息。文件引用同时提供可读路径，Agent 会收到按需调用已有工具补读来源的指引；PDF 和 Office 文件需要可用的文档解析或转换工具。相对路径属于来源会话的工作目录，引用地址本身不授予文件访问权限。
 
-网页引用包含选文、URL 和原生页面标识。需要更多上下文时，Agent 可调用包内的 `paper_margin_browser`，直接读取同一张已打开网页，沿用它的登录态和动态内容，也可查找原句附近文字、分段继续读取。正文按需传给 Agent，返回读取时间、范围和页面版本。读取范围为已加载的主文档文字；图片、Canvas、内嵌框架和尚未加载的内容不在其中。[原生网页补读说明](docs/native-browser.md)。
+Agent 会自动收到本会话原生侧栏的网页、文件和侧聊清单，包含活动/可见状态及来源信息。可以直接说「看看侧栏这份内容」，无需先划选。文件通过现有工具按路径读取；网页通过同包 `paper_margin_browser` 查看章节结构和正文，沿用同一张页面的登录态与动态内容。短网页可一次读全，长网页支持继续读取和查找。图片、Canvas、内嵌框架和尚未加载的内容不在正文中，也不会自动附上截图。[原生侧栏上下文说明](docs/native-browser.md)。
 
 ## 安装
 
@@ -34,7 +34,7 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.1/install.ps1 | iex
 ```
 
 脚本下载并校验一个完整安装包，调用官方插件安装命令。旧双包用户也用这条命令升级：脚本会备份配置、移除旧配套包并保留注释和侧聊记录。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
@@ -44,12 +44,12 @@ irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/ins
 首次安装可直接使用单个 URL：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/dsh-paper-margin-2.6.0.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.1/dsh-paper-margin-2.6.1.tgz --ignore-scripts --save-exact
 ```
 
 Web 版将 `desktop` 改成 `web`。Windows Web 版升级可下载脚本后运行 `./install.ps1 -Profile web`。
 
-也可从 [v2.6.0 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.6.0) 下载 **`dsh-paper-margin-2.6.0.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
+也可从 [v2.6.1 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.6.1) 下载 **`dsh-paper-margin-2.6.1.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
 
 旧版分包安装请使用上面的一键脚本，以同时迁移旧 entry 覆盖项。配置迁移和来源见 [集成说明](docs/integration.md)。
 

@@ -28,7 +28,8 @@ export function nativePages(): NativePage[] {
     try {
       const url = frame.getURL()
       if (!/^https?:\/\//i.test(url)) continue
-      pages.push({ id: nativePageId(frame)!, sessionId, url, title: (frame.getTitle?.() ?? '').slice(0, 500), visible: readerSurfaceVisible(frame) })
+      const tabId = frame.closest<HTMLElement>('[data-sidebar-right-tab]')?.dataset.sidebarRightTab
+      pages.push({ id: nativePageId(frame)!, sessionId, url, title: (frame.getTitle?.() ?? '').slice(0, 500), visible: readerSurfaceVisible(frame), ...(tabId ? { tabId } : {}) })
     } catch { /* A guest can be between attachment and dom-ready. */ }
     if (pages.length === 64) break
   }

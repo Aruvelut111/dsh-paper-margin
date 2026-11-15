@@ -31,6 +31,25 @@ export function readNativeDocument(win: Window, request: PageRead): PageOutcome 
     totalCharacters: full.length, readableCharacters: text.length, textLimitReached: full.length > text.length,
     embeddedFrames: win.document.querySelectorAll('iframe,frame').length, offset, nextOffset: null,
   }
+  if (request.action === 'observe') {
+    const headings: { level: number; text: string }[] = []
+    let headingsTruncated = false
+    for (const heading of win.document.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')) {
+      if (heading.closest('[hidden], [aria-hidden="true"]')) continue
+      let hidden = false
+      for (let node: Element | null = heading; node; node = node.parentElement) {
+        const style = win.getComputedStyle(node)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') { hidden = true; break }
+      }
+      const label = heading.innerText?.trim()
+      if (hidden || !label) continue
+      if (headings.length === 60) { headingsTruncated = true; break }
+      headings.push({ level: Number(heading.tagName.slice(1)), text: label.slice(0, 160) })
+    }
+    value.structure = { headings, headingsTruncated,
+      images: win.document.querySelectorAll('img').length, canvases: win.document.querySelectorAll('canvas').length,
+      tables: win.document.querySelectorAll('table').length }
+  }
   if (request.action === 'find') {
     const query = request.query!
     const matches: { offset: number; text: string }[] = []

@@ -78,7 +78,7 @@ function applyInner(ctx: unknown): void {
   } catch { /* sessions not ready: citations resolve without a session */ }
 
   applyPreview(ctx as never, registry)
-  c.effect?.(() => attachNativePageReader(), 'dsh-paper-margin: native page reader')
+  c.effect?.(() => attachNativePageReader(fetch, c), 'dsh-paper-margin: native page reader')
 
   // Settings card controls the standalone direct-send button visibility.
   // configForms is read through ctx.get (sidenote's pattern): the settings

@@ -47,6 +47,18 @@ it('extracts rendered text once per explicit request and validates bounded argum
   expect(getter).toHaveBeenCalledTimes(1)
   for (const bad of [{ limit: 20001 }, { offset: -1 }, { offset: 1.5 }, { action: 'find', query: '' }]) expect(validRead(request(bad as never))).toBe(false)
 })
+it('observes the whole heading structure beyond the initial text window and reports visual gaps', () => {
+  document.body.innerHTML = '<h1>Page title</h1><h2 hidden>Hidden</h2><div style="display:none"><h2>Also hidden</h2></div>'
+    + '<h2>Section near the end</h2><img><canvas></canvas><table></table><iframe></iframe>'
+  for (const element of document.querySelectorAll('h1,h2')) Object.defineProperty(element, 'innerText', { get: () => element.textContent })
+  rendered('Page title\n' + 'x'.repeat(25000) + '\nSection near the end')
+  const result = readNativeDocument(window, request({ action: 'observe', limit: 50 }))
+  expect(result).toMatchObject({ ok: true, value: { nextOffset: 50, embeddedFrames: 1, structure: {
+    headings: [{ level: 1, text: 'Page title' }, { level: 2, text: 'Section near the end' }],
+    headingsTruncated: false, images: 1, canvases: 1, tables: 1,
+  } } })
+  expect(validRead(request({ action: 'observe', offset: 1 }))).toBe(false)
+})
 it('reads ordinary HTTP pages where crypto.randomUUID is unavailable', () => {
   rendered('HTTP source text')
   delete (window as Window & { __paperMarginReadDocument?: string }).__paperMarginReadDocument
