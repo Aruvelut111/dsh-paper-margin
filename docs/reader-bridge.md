@@ -19,3 +19,7 @@ Paper Margin 的阅读模块捕获原文和来源，包内注释模块管理草�
 `reply` 同步返回 `{accepted,id?,items?}`。数据变化后派发 `dsh-sidenote:external-annotations-changed`；回源通过 `dsh-sidenote:reveal-external:v1`，携带 `{sessionId,source,text}`。
 
 发送内容采用 sidenote 的注释前缀：`<annotation>` 包含 `<quote>` 和可选 `<note>`。文本进行 XML 转义。宿主确认消息进入目标会话或队列后，该批次才转为已发送；原文高亮随之移除，消息保留当次快照。
+
+`<quote>` 保留 `[Source: …]` 原始来源地址；可解码的文件地址另附 `[File path: "…"]`。相对路径同时附来源会话 `[Source session: "…"]`，避免把另一个工作目录的同名文件当作来源。路径值使用 JSON 字符串转义，之后随整个 quote 做 XML 转义。不改变已有注释字段、编号、持久化键或反解析协议。
+
+这些字段是定位信息，不是全文内容或读取授权。插件通过现有系统提示词入口说明补读规则，文件与网页读取仍使用 Agent 已有工具。原生侧栏网页的登录态和页面全文没有通过该事件开放给模型。

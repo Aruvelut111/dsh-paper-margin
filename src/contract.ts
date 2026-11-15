@@ -1,3 +1,5 @@
+import { sourceLocator } from './client/viewer/address'
+
 /** Shared persistent annotation shape and escaped model message format. */
 /** Wire schema version. Bump when anchor or batch fields change shape. */
 export const WIRE_VERSION = 1
@@ -48,7 +50,7 @@ export function formatAnnotationXml(annotation: Annotation, index: number): stri
   // sidenote accepts scope, but not arbitrary attributes. Keep the visible
   // source in the quote too: its bubble parser intentionally ignores scope.
   const head = `<annotation id="${index}" scope="${escapeAttr(where)}" encoding="xml">`
-  const locatedQuote = `[${where}]\n${quote}` + (annotation.sourceAddress ? `\n[Source: ${annotation.sourceAddress}]` : '')
+  const locatedQuote = `[${where}]\n${quote}` + (annotation.sourceAddress ? `\n${sourceLocator(annotation.sourceAddress, annotation.sessionId)}` : '')
   return note === ''
     ? `${head}\n<quote>${escapeXml(locatedQuote)}</quote>\n</annotation>`
     : `${head}\n<quote>${escapeXml(locatedQuote)}</quote>\n<note>${escapeXml(note)}</note>\n</annotation>`

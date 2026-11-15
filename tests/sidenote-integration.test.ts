@@ -23,7 +23,7 @@ it('uses the real sidenote store, editor callback, numbering, persistence and pa
   expect(store.listActive('s').map(a => a.number)).toEqual([1, 2])
   expect(open).toHaveBeenCalledOnce()
   const wire = sidenoteBlock(store.listActive('s')); const parsed = splitProtocolPrefix(wire)!
-  expect(parsed.annotations).toHaveLength(2); expect(parsed.annotations[0]?.quote).toBe(first.text + '\n[Source: dsh-resource://file/session/s/book.pdf]'); expect(parsed.annotations[0]?.note).toBe('任意文字 </note> & <tag>')
+  expect(parsed.annotations).toHaveLength(2); expect(parsed.annotations[0]?.quote).toBe(first.text + '\n[Source: dsh-resource://file/session/s/book.pdf]\n[File path: "book.pdf"]\n[Source session: "s"]'); expect(parsed.annotations[0]?.note).toBe('任意文字 </note> & <tag>')
   expect(createAnnotationStore(() => 2, localStorage).listActive('s')[0]?.externalSource?.page).toBe(7)
   expect(store.listActive('another')).toHaveLength(0)
   off(); expect(sidenoteAvailable()).toBe(false)

@@ -28,7 +28,7 @@ export function installGuestOverlay(win: GuestWindow, changed?: () => void): voi
     return { nodes, text }
   }
   let projection: ReturnType<typeof textNodes> | undefined
-  const ranges = new Map<number, Range>()
+  const ranges = new Map<number, Range | null>()
   const resolve = (quote: string, selector?: TextAnchor): Range | undefined => {
     const { nodes, text } = projection ??= textNodes(); const exact = selector?.exact || quote; if (!exact.trim()) return
     const matches: number[] = []; for (let at = text.indexOf(exact); at >= 0; at = text.indexOf(exact, at + 1)) matches.push(at)
@@ -45,13 +45,17 @@ export function installGuestOverlay(win: GuestWindow, changed?: () => void): voi
     // ranges; overlay writes happen after every range has been measured.
     const plans = saved.map(note => {
       let range = ranges.get(note.id)
-      if (!range?.startContainer.isConnected || !range.endContainer.isConnected) range = resolve(note.anchorText, note.externalSource?.anchor)
-      if (range) ranges.set(note.id, range)
-      return {note, rects: range && typeof range.getClientRects === 'function' ? [...range.getClientRects()] : []}
+      // A missing quote stays missing until the content observer invalidates
+      // this revision; scrolling must not search the whole page again.
+      if (range === undefined || range !== null && (!range.startContainer.isConnected || !range.endContainer.isConnected)) {
+        range = resolve(note.anchorText, note.externalSource?.anchor) ?? null
+        ranges.set(note.id, range)
+      }
+      return {note, rects: range && typeof range.getClientRects === 'function' ? [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < win.innerHeight && rect.right > 0 && rect.left < win.innerWidth) : []}
     })
     layer.replaceChildren(); let previous = -24
     for (const {note, rects} of plans) {
-      const rect = rects.find(rect => rect.bottom > 0 && rect.top < win.innerHeight); if (!rect) continue
+      const rect = rects[0]; if (!rect) continue
       for (const rect of rects) { const mark = doc.createElement('span'); mark.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;background:#2f88ff22;pointer-events:none`; layer.append(mark) }
       const badge = doc.createElement('button'); badge.type = 'button'; badge.dataset.paperMarginGuestBadge = String(note.id); badge.textContent = String(note.number); badge.title = note.anchorText + '\n' + note.note; badge.setAttribute('aria-label', `查看阅读批注 ${note.number}`)
       const top = Math.max(2, rect.top, previous + 23); if (top + 20 > win.innerHeight) continue; previous = top

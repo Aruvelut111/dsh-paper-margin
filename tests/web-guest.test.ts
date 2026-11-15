@@ -1,6 +1,35 @@
 import { expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
 import { build } from 'esbuild'
+it('caches missing anchors until content changes and draws only visible quote rectangles', async () => {
+  const compiled = await build({ entryPoints: ['src/client/annotate/web.ts'], bundle: true, write: false, format: 'iife', globalName: 'Guest', minify: true, platform: 'browser', target: 'es2022' })
+  const dom = new JSDOM('<body><p>original passage</p></body>', { url: 'https://example.test/article', runScripts: 'dangerously', pretendToBeVisual: true })
+  const win = dom.window
+  const frames = new Map<number, FrameRequestCallback>(); let nextFrame = 0
+  win.requestAnimationFrame = callback => { frames.set(++nextFrame, callback); return nextFrame }
+  win.cancelAnimationFrame = id => { frames.delete(id) }
+  const flush = () => { const callbacks = [...frames.values()]; frames.clear(); for (const callback of callbacks) callback(0) }
+  win.Range.prototype.getClientRects = () => [new win.DOMRect(10, -40, 80, 18), new win.DOMRect(10, 20, 80, 18), new win.DOMRect(10, win.innerHeight + 20, 80, 18), new win.DOMRect(win.innerWidth + 20, 20, 80, 18)] as unknown as DOMRectList
+  win.eval(`window.missingSearches=0;const indexOf=String.prototype.indexOf;String.prototype.indexOf=function(needle,...rest){if(needle==='missing passage')window.missingSearches++;return indexOf.call(this,needle,...rest)}`)
+  win.eval(compiled.outputFiles[0]!.text + ';Guest.installGuestOverlay(window)')
+  const api = (win as unknown as { __paperMarginGuest: { setNotes(notes: unknown[]): void; suspend(): void; resume(): void; dispose(): unknown }; missingSearches: number })
+  try {
+    api.__paperMarginGuest.setNotes([{ id: 1, number: 1, state: 'active', anchorText: 'missing passage', note: '' }]); flush()
+    expect(api.missingSearches).toBe(1)
+    for (let i = 0; i < 30; i++) { win.dispatchEvent(new win.Event('scroll')); flush() }
+    expect(api.missingSearches).toBe(1)
+    win.document.querySelector('p')!.textContent = 'missing passage'
+    await Promise.resolve(); flush()
+    expect(win.document.querySelector('[data-paper-margin-guest-badge]')?.textContent).toBe('1')
+    expect(win.document.querySelector('div[data-paper-margin-web]')!.querySelectorAll('span')).toHaveLength(1)
+    api.__paperMarginGuest.suspend(); win.document.querySelector('p')!.textContent = 'original passage'
+    await Promise.resolve(); flush()
+    const beforeResume = api.missingSearches
+    win.dispatchEvent(new win.Event('scroll')); flush(); expect(api.missingSearches).toBe(beforeResume)
+    api.__paperMarginGuest.resume(); flush(); expect(api.missingSearches).toBe(beforeResume + 1)
+    expect(win.document.querySelector('[data-paper-margin-guest-badge]')).toBeNull()
+  } finally { api.__paperMarginGuest.dispose(); win.close() }
+})
 it('reuses one text projection across notes and scrolling, and suspends saved overlays', async () => {
   const compiled=await build({entryPoints:['src/client/annotate/web.ts'],bundle:true,write:false,format:'iife',globalName:'Guest',minify:true,platform:'browser',target:'es2022'})
   const dom=new JSDOM('<body>'+Array.from({length:40},(_,i)=>'<p>unique passage '+i+' end</p>').join('')+'</body>',{url:'https://example.test/article',runScripts:'dangerously',pretendToBeVisual:true})

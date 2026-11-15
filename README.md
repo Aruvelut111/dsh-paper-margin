@@ -15,6 +15,16 @@
 
 插件内置侧边聊天，其中的划选加入该侧聊的输入框，随该侧聊发送。主会话与侧聊各自编号、保存和发送。
 
+### 对照多份资料
+
+可以从不同文件或网页连续添加引用，放进同一会话的这一批注释，再写「对照这几处，说明适用条件和分歧」。每条引用保留自己的编号、来源和评论。侧聊已有「带回主对话」和「整段回流」，可将选中的回答或整段问答加入主会话的待发送内容。
+
+### Agent 收到哪些内容
+
+发送的是选区、评论和来源信息。文件引用同时提供可读路径，Agent 会收到按需调用已有工具补读来源的指引；PDF 和 Office 文件需要可用的文档解析或转换工具。相对路径属于来源会话的工作目录，引用地址本身不授予文件访问权限。
+
+网页引用包含选文和 URL，不自动包含登录页面全文或截图。Agent 通过独立抓取工具打开 URL 时，登录态、动态内容和页面版本可能与侧栏不同。
+
 ## 安装
 
 需要 DSH **0.2.2 系列**，已在 **0.2.2-rc.1** 验证。
@@ -24,7 +34,7 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/install.ps1 | iex
 ```
 
 脚本下载并校验一个完整安装包，调用官方插件安装命令。旧双包用户也用这条命令升级：脚本会备份配置、移除旧配套包并保留注释和侧聊记录。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
@@ -34,12 +44,12 @@ irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/ins
 首次安装可直接使用单个 URL：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/dsh-paper-margin-2.5.8.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/dsh-paper-margin-2.5.9.tgz --ignore-scripts --save-exact
 ```
 
 Web 版将 `desktop` 改成 `web`。Windows Web 版升级可下载脚本后运行 `./install.ps1 -Profile web`。
 
-也可从 [v2.5.8 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.8) 下载 **`dsh-paper-margin-2.5.8.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
+也可从 [v2.5.9 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.9) 下载 **`dsh-paper-margin-2.5.9.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
 
 旧版分包安装请使用上面的一键脚本，以同时迁移旧 entry 覆盖项。配置迁移和来源见 [集成说明](docs/integration.md)。
 

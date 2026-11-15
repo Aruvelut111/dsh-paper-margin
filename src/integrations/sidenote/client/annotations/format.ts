@@ -1,4 +1,5 @@
 import { t } from '../locales.ts'
+import { sourceLocator } from '../../../../client/viewer/address.ts'
 
 /**
  * Wire format v3（2026-09-06 用户裁定）——发送给模型的数据形态与气泡
@@ -30,6 +31,7 @@ import { t } from '../locales.ts'
  */
 
 export interface QuoteItem {
+  readonly sessionId?: string
   readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number }
   readonly text: string
   readonly note: string
@@ -49,7 +51,7 @@ export function formatAnnotationXml(index: number, item: QuoteItem): string {
   if (item.externalSource) {
     const escape = (value: string) => value.split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;')
     const address = item.externalSource.address
-    const quote = address ? item.text + '\n[Source: ' + address + ']' : item.text
+    const quote = address ? item.text + '\n' + sourceLocator(address, item.sessionId) : item.text
     return '<annotation id="' + id + '" encoding="xml">\n<quote>' + escape(quote) + '</quote>' + (note === '' ? '' : '\n<note>' + escape(note) + '</note>') + '\n</annotation>'
   }
   return note === ''

@@ -12,6 +12,16 @@ Blue markers show pending notes. Numbers start at 1 for each conversation and ba
 
 Selections inside the built-in side chat are added to that child chat and sent from its composer. Main and side conversations keep separate notes, numbering, and submissions.
 
+### Compare sources
+
+Add passages from several files or webpages to the same conversation's pending batch, then ask how their conditions or conclusions differ. Each passage keeps its number, source, and comment. Side chat already offers **Bring back to main conversation** for individual replies and **Reflow all** for the full Q&A; these join the main conversation's pending context.
+
+### What reaches the Agent
+
+A message includes selected excerpts, comments, and source locators. File citations also include a decoded host path. The Agent receives guidance to read additional context with its existing tools when needed; PDF and Office files require an available document parser or converter. Relative paths belong to the source session's workspace. A locator does not grant file access.
+
+Web citations include selected text and a URL, not the logged-in page's full text or a screenshot. A separate fetch may use different login state, dynamic content, or page versions than the sidebar.
+
 ## Install
 
 Supports DSH 0.2.2; tested with 0.2.2-rc.1.
@@ -19,7 +29,7 @@ Supports DSH 0.2.2; tested with 0.2.2-rc.1.
 On Windows, quit DSH and run in PowerShell:
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/install.ps1 | iex
 ```
 
 The [installer](scripts/install.ps1) downloads and verifies one complete package, then uses the official DSH plugin command. For older two-package installations, it backs up profile metadata, removes the former companion package and migrates its settings. Existing notes and side chats keep their storage identities. Restart DSH afterward.
@@ -27,12 +37,12 @@ The [installer](scripts/install.ps1) downloads and verifies one complete package
 For a fresh installation with `dsh` on PATH:
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/dsh-paper-margin-2.5.8.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/dsh-paper-margin-2.5.9.tgz --ignore-scripts --save-exact
 ```
 
 For Web, replace `desktop` with `web`. On Windows, download the installer and run `./install.ps1 -Profile web` to upgrade a Web profile.
 
-For manual installation, download **`dsh-paper-margin-2.5.8.tgz`** from [v2.5.8](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.8) and add that single file through DSH Plugins. The reader, webpage annotations, annotation list and side chat are all included. Older split installations should use the installer to migrate the former profile entries too.
+For manual installation, download **`dsh-paper-margin-2.5.9.tgz`** from [v2.5.9](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.9) and add that single file through DSH Plugins. The reader, webpage annotations, annotation list and side chat are all included. Older split installations should use the installer to migrate the former profile entries too.
 
 See [integration details](docs/integration.md) for source attribution and upgrade behavior.
 
