@@ -2,8 +2,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
 import { attachWebAnnotations } from '../src/client/annotate/web'
-import { createAnnotationStore } from './fixtures/sidenote/src/client/annotations/model'
-import { registerExternalAnnotations } from './fixtures/sidenote/src/client/annotations/external'
+import { createAnnotationStore } from '../src/integrations/sidenote/client/annotations/model'
+import { registerExternalAnnotations } from '../src/integrations/sidenote/client/annotations/external'
 import { captureInSidenote } from '../src/client/annotate/sidenote'
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks() })

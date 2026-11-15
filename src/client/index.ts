@@ -30,12 +30,16 @@ import { attachImageAnnotations } from './annotate/image'
 import { registerHtmlPreview } from './viewer/html-preview'
 import { attachDocumentNotes } from './annotate/document-notes'
 import { attachExternalReveal } from './annotate/reveal'
+import { apply as applySidenoteClient } from '../integrations/sidenote/client/index'
 
 export const inject = [
   'slots',
   'documentPreviews',
   'conversation',
   'sessions',
+  'workspaces',
+  'connection',
+  'configForms',
   'locale',
   'sidebarRight',
   // The reader's byte source. Declaring the Remote row (the same specifier the
@@ -60,6 +64,7 @@ export function apply(ctx: unknown): void {
 }
 
 function applyInner(ctx: unknown): void {
+  const sidenotePreferences = applySidenoteClient(ctx as never)
   const c = ctx as Record<string, unknown> & {
     effect?(fn: () => unknown, label?: string): unknown
     get(name: string): unknown
@@ -81,10 +86,11 @@ function applyInner(ctx: unknown): void {
       | { get(namespace: string): import('./preferences').MarginConfigForm }
       | undefined
     if (forms !== undefined) {
-      const preferences = createMarginPreferences(forms.get('paper-margin'))
+      // Keep the original entry identity so existing chat preferences survive.
+      const preferences = createMarginPreferences(forms.get('side-chat'))
       setSharedPreferences(preferences)
       c.effect?.(() => () => { preferences.dispose() }, 'dsh-paper-margin: preferences')
-      registerMarginSettings(ctx, preferences)
+      registerMarginSettings(ctx, preferences, sidenotePreferences)
     }
   } catch { /* settings are optional: the default (draft-only) stands */ }
 

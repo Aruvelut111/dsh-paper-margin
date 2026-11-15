@@ -10,7 +10,7 @@ Select a passage and click **Add to conversation**. Write a comment beside the s
 
 Blue markers show pending notes. Numbers start at 1 for each conversation and batch, and close gaps after deletion. A successful send removes the source markers; the message keeps its annotation snapshot. Pending notes survive file switches and reloads in the same browser. Closing the sidebar hides its overlays.
 
-Selections inside a sidenote side chat are added to that child chat and sent from its composer. Main and side conversations keep separate notes, numbering, and submissions.
+Selections inside the built-in side chat are added to that child chat and sent from its composer. Main and side conversations keep separate notes, numbering, and submissions.
 
 ## Install
 
@@ -19,27 +19,22 @@ Supports DSH 0.2.2; tested with 0.2.2-rc.1.
 On Windows, quit DSH and run in PowerShell:
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/install.ps1 | iex
 ```
 
-The [installer](scripts/install.ps1) locates DSH, downloads and verifies both packages, and calls the official plugin command. Restart DSH afterward.
+The [installer](scripts/install.ps1) downloads and verifies one complete package, then uses the official DSH plugin command. For older two-package installations, it backs up profile metadata, removes the former companion package and migrates its settings. Existing notes and side chats keep their storage identities. Restart DSH afterward.
 
-With `dsh` on PATH, install directly from the release URLs:
+For a fresh installation with `dsh` on PATH:
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-paper-margin-2.5.7.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/dsh-paper-margin-2.5.8.tgz --ignore-scripts --save-exact
 ```
 
-For Web, replace `desktop` with `web`. To install manually, download both tarballs from [v2.5.7](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.7) and add them through DSH Plugins:
+For Web, replace `desktop` with `web`. On Windows, download the installer and run `./install.ps1 -Profile web` to upgrade a Web profile.
 
-- `dsh-paper-margin-2.5.7.tgz`
-- `dsh-sidenote-0.8.5-reader.5.tgz`
+For manual installation, download **`dsh-paper-margin-2.5.8.tgz`** from [v2.5.8](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.8) and add that single file through DSH Plugins. The reader, webpage annotations, annotation list and side chat are all included. Older split installations should use the installer to migrate the former profile entries too.
 
-The paired sidenote package replaces an existing package of the same name. It adds the reader bridge to [g-yixuan/dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote); source and history are preserved in the [reader fork](https://github.com/Aruvelut111/dsh-sidenote/tree/fix/external-reader-annotations).
-
-```sh
-dsh plugin --profile desktop add ./dsh-paper-margin-2.5.7.tgz ./dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
-```
+See [integration details](docs/integration.md) for source attribution and upgrade behavior.
 
 ## Formats
 
@@ -59,7 +54,7 @@ npm run check
 npm pack
 ```
 
-The check covers architecture, types, build, and unit tests, including a self-contained sidenote protocol fixture. Host checks cover sidebar cleanup, numbering and payload isolation between two conversations, deletion, and reload recovery.
+The check covers architecture, types, build, and unit tests, including the integrated annotation runtime and profile migration. Host checks cover sidebar cleanup, numbering and payload isolation between two conversations, deletion, and reload recovery.
 
 Notes use localStorage in the current browser origin. Clearing site data removes them.
 

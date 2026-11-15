@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { createAnnotationStore } from './fixtures/sidenote/src/client/annotations/model'
-import { registerExternalAnnotations } from './fixtures/sidenote/src/client/annotations/external'
-import { buildProtocolBlock as sidenoteBlock, splitProtocolPrefix } from './fixtures/sidenote/src/client/annotations/format'
+import { createAnnotationStore } from '../src/integrations/sidenote/client/annotations/model'
+import { registerExternalAnnotations } from '../src/integrations/sidenote/client/annotations/external'
+import { buildProtocolBlock as sidenoteBlock, splitProtocolPrefix } from '../src/integrations/sidenote/client/annotations/format'
 import { captureInSidenote, sidenoteAvailable } from '../src/client/annotate/sidenote'
 import { buildProtocolBlock } from '../src/contract'
 import { createAnnotation } from '../src/client/annotate/model'

@@ -10,6 +10,6 @@ npm run check
 
 修复请从 `main` 建分支并提交 Pull Request。说明复现步骤、修改后的行为和运行过的检查。涉及侧栏、选区或发送时，附上对应的 DSH 版本和操作结果。
 
-`tests/fixtures/sidenote/` 是配套 sidenote 的测试快照，来源和版本记录在该目录。调整外部批注协议时同时更新接口文档、配套实现和测试。
+注释与侧聊源码已内置在 `src/integrations/sidenote/`，测试直接导入这些运行模块。单独克隆本仓库即可构建和测试。调整阅读批注协议时，同时更新接口文档、包内双方实现和测试；来源和迁移约定见 `docs/integration.md`。
 
 提交前检查 `git diff --cached`。只提交代码、合成测试样本和公开文档；本地 profile、聊天记录、访问令牌和用户文件留在工作目录。

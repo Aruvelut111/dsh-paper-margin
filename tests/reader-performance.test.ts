@@ -3,8 +3,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { observeReaderRoots, observeReaderVisibility, readerSessionId } from '../src/client/annotate/reader-surface'
 import { readerControls } from '../src/client/viewer/controls'
 import { attachDocumentNotes } from '../src/client/annotate/document-notes'
-import { createAnnotationStore } from './fixtures/sidenote/src/client/annotations/model'
-import { registerExternalAnnotations } from './fixtures/sidenote/src/client/annotations/external'
+import { createAnnotationStore } from '../src/integrations/sidenote/client/annotations/model'
+import { registerExternalAnnotations } from '../src/integrations/sidenote/client/annotations/external'
 import { attachUniversalAnnotator } from '../src/client/annotate/universal'
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve() }

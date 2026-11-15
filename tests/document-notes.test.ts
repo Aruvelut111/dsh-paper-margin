@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { createAnnotationStore } from './fixtures/sidenote/src/client/annotations/model'
-import { registerExternalAnnotations } from './fixtures/sidenote/src/client/annotations/external'
+import { createAnnotationStore } from '../src/integrations/sidenote/client/annotations/model'
+import { registerExternalAnnotations } from '../src/integrations/sidenote/client/annotations/external'
 import { attachDocumentNotes, findDocumentQuote } from '../src/client/annotate/document-notes'
 
 afterEach(() => { document.body.replaceChildren(); localStorage.clear() })

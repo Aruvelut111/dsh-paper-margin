@@ -10,6 +10,7 @@ export const LOCALE_NS = 'dsh-sidenote'
 
 /** 英文词典（key 的权威清单）。 */
 export const en = {
+  chatSettings: 'Side chat and annotations',
   diagTitle: 'Compatibility diagnostics',
   diagClose: 'Close compatibility diagnostics',
   diagUnknownVersion: 'version unknown',
@@ -267,6 +268,7 @@ export type CopyKey = keyof typeof en
 
 /** 中文词典（与 en 同 key）。 */
 export const zh: Record<CopyKey, string> = {
+  chatSettings: '侧聊与批注',
   nativeQuote: '引用',
   nativeQuoteHint: '将所选文字作为引用加入当前对话的输入框',
   nativeQuoteFailed: '暂时无法加入引用，请等待输入框就绪后重试。',

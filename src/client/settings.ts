@@ -1,12 +1,15 @@
 /**
- * Settings page: one card, one switch (direct submit). Rendered into the
+ * Combined reader, annotation and side-chat settings. Rendered into the
  * host's settings.section slot with the same h() discipline as the reader;
  * state rides the host config form via MarginPreferences.
  */
 import { h } from './h'
 import type { MarginPreferences } from './preferences'
+import type { SidenotePreferences } from '../integrations/sidenote/client/preferences'
+import { SidenoteSettings } from '../integrations/sidenote/client/settings'
+import { createElement } from 'react'
 
-export function registerMarginSettings(ctx: unknown, preferences: MarginPreferences): void {
+export function registerMarginSettings(ctx: unknown, preferences: MarginPreferences, chatPreferences?: SidenotePreferences): void {
   const c = ctx as {
     slots: {
       inject(name: string, factory: () => unknown): unknown
@@ -19,10 +22,10 @@ export function registerMarginSettings(ctx: unknown, preferences: MarginPreferen
     label: 'Paper Margin',
     order: 81,
     registrant: 'dsh-paper-margin',
-  }, () => MarginSettings(preferences)))
+  }, () => MarginSettings(preferences, chatPreferences)))
 }
 
-function MarginSettings(preferences: MarginPreferences) {
+function MarginSettings(preferences: MarginPreferences, chatPreferences?: SidenotePreferences) {
   const React = require('react') as {
     useSyncExternalStore: (subscribe: (fn: () => void) => () => void, getSnapshot: () => unknown) => unknown
   }
@@ -33,7 +36,7 @@ function MarginSettings(preferences: MarginPreferences) {
     h('div', { style: rowStyle, role: 'group', 'aria-label': '直接发送批注' },
       h('div', { style: copyStyle },
         h('span', { style: labelStyle }, '显示「直接发送」按钮'),
-        h('p', { style: hintStyle }, '独立批注面板的可选快捷操作。「加入输入框」始终只添加草稿；接入 sidenote 后随主输入框一起发送。')),
+        h('p', { style: hintStyle }, '独立批注面板的可选快捷操作。「加入输入框」始终只添加草稿；阅读批注随对应对话一起发送。')),
       h('button', {
         role: 'switch',
         'aria-checked': state.directSubmit,
@@ -42,6 +45,7 @@ function MarginSettings(preferences: MarginPreferences) {
         style: state.directSubmit ? switchOnStyle : switchOffStyle,
         onClick: () => { void preferences.setDirectSubmit(!state.directSubmit) },
       }, state.directSubmit ? '开' : '关')),
+    chatPreferences ? createElement(SidenoteSettings, { preferences: chatPreferences }) : null,
     state.saving ? h('p', { style: statusStyle }, '保存中…') : null,
     state.status === 'unavailable' ? h('p', { style: errorStyle2 }, '设置服务不可用') : null,
     state.failed ? h('p', { style: errorStyle2 }, '保存失败，请重试') : null)
