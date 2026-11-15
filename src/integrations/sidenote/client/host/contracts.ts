@@ -1,0 +1,557 @@
+/**
+ * Structural mirror of the runtime surfaces dsh-sidenote consumes.
+ *
+ * Third-party plugins resolve outside the DSH monorepo's single cordis
+ * instance, so upstream `declare module 'cordis'` augmentations never reach
+ * our `Context` type. We mirror the runtime shapes here instead — drift from
+ * upstream is contained to this file. Each section names its authority (the
+ * upstream .d.ts it mirrors); extend sections as features need more surface,
+ * keeping the mirror honest (only declare what actually exists at runtime).
+ *
+ * Authorities:
+ * - betterSidebar: dsh-better-sidebar `src/client/service.ts` (+ docs/external-plugin-guide.md)
+ * - sessions/workspaces: `@deepseek-ai/dsh-client-runtime` lib/types/client/contract/{sessions,session,workspaces}.d.ts
+ *   (local checkout: <dsh install>/node_modules/@deepseek-ai/dsh-client-runtime/lib/types/client/...)
+ * - conversation input / slots: `@deepseek-ai/dsh-client-ui-conversation` / `dsh-client-ui-slots` type surfaces
+ */
+import type { Context as CordisContext } from 'cordis'
+import type { ReactNode } from 'react'
+
+export type SessionId = string
+
+/** Minimal observable snapshot shape (identity-stable, useSyncExternalStore-ready). */
+export interface ObservableSnapshot<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
+
+// ── betterSidebar (dsh-better-sidebar client-half service) ──────────────────
+
+export interface SessionScope {
+  sessionId: SessionId
+  cwd?: string
+}
+
+/** A live sidebar tab instance. `meta` is plugin-owned JSON persisted with the layout. */
+export interface SidebarTab {
+  id: string
+  type: string
+  title: string
+  path?: string
+  meta?: unknown
+}
+
+/**
+ * 侧栏状态 = splits/bottomSplits 两棵 split/leaf 树（权威：dsh-better-sidebar
+ * src/client/state.ts）：leaf 持有 tabs；split 递归分栏。
+ */
+export interface SidebarLeafNode {
+  kind: 'leaf'
+  id: string
+  tabs: SidebarTab[]
+  active: string | null
+}
+
+export interface SidebarSplitNode {
+  kind: 'split'
+  id: string
+  dir: 'row' | 'col'
+  sizes: number[]
+  children: SidebarTreeNode[]
+}
+
+export type SidebarTreeNode = SidebarLeafNode | SidebarSplitNode
+
+export interface SidebarState {
+  /** 右侧面板的 split 树。 */
+  splits: SidebarTreeNode
+  /** 底部面板的 split 树。 */
+  bottomSplits: SidebarTreeNode
+}
+
+export interface SidebarSnapshot {
+  sessionId?: SessionId
+  state?: SidebarState
+  prefs?: Record<string, unknown>
+}
+
+/** better-sidebar's store handle (external tabs treat it as opaque). */
+export type SidebarStore = unknown
+
+export interface TabComponentProps {
+  ctx: Context
+  store: SidebarStore
+  scope: SessionScope
+  tab: SidebarTab
+  visible: boolean
+}
+
+export interface TabDescriptor {
+  id: string
+  title: string | (() => string)
+  icon?: ReactNode | ((size: number) => ReactNode)
+  order?: number
+  hidden?: boolean
+  available?: (ctx: Context, scope: SessionScope, state: SidebarState) => boolean
+  single?: boolean
+  dedupeKey?: (tab: SidebarTab) => string | undefined
+  createTab?: (state: SidebarState) => { tab: SidebarTab; patch?: Partial<SidebarState> } | null
+  badge?: (ctx: Context, scope: SessionScope, state: SidebarState) => string | number | null | undefined
+  onOpen?: (tab: SidebarTab, scope: SessionScope) => void
+  onActivate?: (tab: SidebarTab, scope: SessionScope) => void
+  onClose?: (tab: SidebarTab, scope: SessionScope) => void
+  component: (props: TabComponentProps) => ReactNode
+}
+
+export interface OpenTabSeed {
+  type: string
+  title?: string
+  path?: string
+  id?: string
+  url?: string
+  meta?: unknown
+}
+
+export interface BetterSidebarService {
+  readonly version: string
+  readonly features: readonly string[]
+  registerTab(descriptor: TabDescriptor): () => void
+  openTab(seed: OpenTabSeed, scope?: SessionScope): void
+  closeTab(tabId: string, scope?: SessionScope): void
+  activateTab(tabId: string, scope?: SessionScope): void
+  updateTab(tabId: string, patch: { title?: string; path?: string; meta?: unknown }): void
+  getTab(id: string): TabDescriptor | undefined
+  getTabs(): readonly TabDescriptor[]
+  isTabEnabled(id: string): boolean
+  getSnapshot(): SidebarSnapshot
+  subscribeState(listener: () => void): () => void
+  subscribe(listener: () => void): () => void
+}
+
+// ── sessions (dsh-client-runtime) ────────────────────────────────────────────
+
+export interface SessionListSnapshot {
+  /** Currently selected session id. */
+  current?: SessionId
+  [key: string]: unknown
+}
+
+export interface ForkOptions {
+  sessionId: SessionId
+  atSeq?: number
+  increaseTitle?: boolean
+}
+
+/** Text plus browser-owned parts; text covers everything we send today. */
+export type PromptContentPart = { type: 'text'; text: string } | { type: string; [key: string]: unknown }
+
+/**
+ * session.prompt 的返回（权威：contract/session.d.ts 的 RpcResult）——
+ * 直接的 ok 联合（**没有** .result 包装；那是 connection.api wire 面的
+ * RpcEnvelope，两者别混）。收窄动机：镜像过宽会让宿主演进时 typecheck
+ * 不红、e2e 假绿（arch-audit §4）。
+ */
+export type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { message?: string } }
+
+/**
+ * Conversation read model (subset). Extend from
+ * dsh-client-runtime `lib/types/client/sessions/conversation.d.ts` as needed —
+ * the real shape has chat/nodes/partial/queue/running and more.
+ */
+export interface ConversationSnapshot {
+  sessionId: SessionId
+  nodes: readonly unknown[]
+  running: boolean
+  [key: string]: unknown
+}
+
+export interface ISession {
+  readonly sessionId: SessionId
+  prompt(content: PromptContentPart[], mode: 'queue' | 'steer'): Promise<RpcResult<{ accepted: true }>>
+  cancel(): Promise<unknown>
+  rename(title: string): Promise<unknown>
+  loadOlder(): Promise<void>
+  command(line: string): Promise<unknown>
+}
+
+export type SessionFace = ISession & ObservableSnapshot<ConversationSnapshot>
+
+export interface SessionBinding {
+  session: SessionFace
+}
+
+/** 0.1.7+ 的独立、引用计数式会话所有权；每次 retain 对应一次 release。 */
+export interface SessionReference {
+  readonly binding: SessionBinding
+  readonly ready: Promise<SessionBinding>
+  release(): void
+}
+
+/**
+ * 0.1.2 的会话内容读取面（off-face，惰性探测；权威：W00-fork-replay-012.md）。
+ * 0.1.2 拆包后 Session 快照只剩控制面，nodes/partial/runningCalls 移入
+ * uiConversation 服务 binding(source).target('chat') 快照的 .legacy 切片。
+ * binding() 对未知会话 throw（调用点必须 try/catch）。
+ */
+export interface UiConversationLike {
+  binding(source: unknown): { target(name: string): { subscribe(fn: () => void): () => void; getSnapshot(): unknown } | undefined } | undefined
+  /** 0.2.1+: pure original-text rules, rendered by conversation.user.text.node. */
+  userText?: { register(rule: { id: string; order: number; match(text: string, from: number): { id: string; start: number; end: number; data: unknown } | undefined }): () => void }
+}
+
+export interface SessionsService {
+  list: ObservableSnapshot<SessionListSnapshot>
+  fork(opts: ForkOptions): Promise<SessionId>
+  /** 0.1.7+：显式持有 generation；旧宿主缺席时继续使用 binding 的旧语义。 */
+  retain?(id: SessionId, options: { source: string; signal?: AbortSignal }): SessionReference
+  binding(id: SessionId): SessionBinding | undefined
+  scope(id: SessionId): Context | undefined
+  open?(id: SessionId): void
+}
+
+// ── workspaces (dsh-client-runtime) ─────────────────────────────────────────
+
+export interface WorkspacesService {
+  archiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * 0.1.7+ 新增；同时是 ArchivedSessionGate 的版本判据——该宿主把「已归档」
+   * 当作拒跑模型步的硬闸门（turn/end blocked），归档侧边子会话前必须判空。
+   */
+  unarchiveSession?(sessionId: SessionId): Promise<void>
+}
+
+// ── conversation input machine (dsh-client-ui-conversation; lazy via ctx.get) ─
+
+export interface SessionInput {
+  setDraft(text: string): void
+  insertQuote?(text: string): boolean
+  submit(mode?: 'queue' | 'steer'): void
+  notify(level: string, text: string): void
+}
+
+export interface ConversationService {
+  input: {
+    for(ctx: Context): SessionInput | undefined
+  }
+}
+
+// ── connection（dsh-client-connection；sessions RPC 直达面）──────────────────
+
+/** 会话的当前模型选择（`session.models` 的 current 字段）。 */
+export interface ModelSelection {
+  provider: string
+  model: string
+  reasoningEffort?: string
+}
+
+/**
+ * Remote session face（dsh >= 0.1.5 的模型读写照面；0.1.5 删除了
+ * `connection.api.sessions.*` 的 client 面后由它接管）。
+ * `remote`/`remote.session` 在宿主侧是可注入服务，但本插件不声明 inject
+ * （0.1.2 及更早无此服务，声明会让插件在旧宿主上永不激活）——调用点经
+ * `ctx.get` 惰性探测（cordis 的 get 不受 inject 门禁限制）。
+ * Authority：`@deepseek-ai/dsh-api-session-controller/lib/typert.remote-client.d.ts`
+ * （RemoteResult = `{ok: true, value} | {ok: false, error}`；error 实为
+ * RemoteError 实例，code 必有、message 继承 Error，这里弱化为可读取切片）。
+ */
+export interface RemoteSessionModelFace {
+  selectModel(request: {
+    sessionId: SessionId
+    provider: string
+    model: string
+    reasoningEffort?: string
+  }): Promise<{ ok: true; value: unknown } | { ok: false; error: { code?: string; message?: string } }>
+  /** 宿主级模型目录（authority 同上，`ModelCatalog`）。 */
+  modelCatalog?(): Promise<{ ok: true; value: ModelCatalogFace } | { ok: false; error: { code?: string; message?: string } }>
+}
+
+/** `remote.session.modelCatalog()` 的返回切片（authority: 同上 `ModelCatalog`）。 */
+export interface ModelCatalogFace {
+  readonly default: ModelSelection
+  readonly routableProviders: readonly string[]
+  readonly groups: SessionModelsResult['groups']
+  readonly failures?: readonly unknown[]
+}
+
+export interface SessionModelsResult {
+  current: ModelSelection
+  routable: boolean
+  groups: readonly {
+    id: string
+    name: string
+    models: readonly { id: string; name: string; description?: string }[]
+  }[]
+  failures?: readonly unknown[]
+}
+
+export interface RpcEnvelope<T> {
+  result: { ok: true; value: T } | { ok: false; error: { message?: string } }
+}
+
+export interface ConnectionSessionsApi {
+  models(payload: { sessionId: SessionId }): Promise<RpcEnvelope<SessionModelsResult>>
+  selectModel(payload: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string }): Promise<RpcEnvelope<{ selected: ModelSelection }>>
+}
+
+export interface ConnectionService {
+  api: { sessions: ConnectionSessionsApi }
+}
+
+// ── Context ──────────────────────────────────────────────────────────────────
+
+// ── locale（dsh-client-locale；DSH 通用设置的语言偏好，Host-backed）────────────
+
+export interface LocaleService {
+  getSnapshot(): { active: string }
+  subscribe(fn: () => void): () => void
+}
+
+export interface Context extends CordisContext {
+  /**
+   * better-sidebar 客户端服务（optional peer——WI-05 起可缺席；缺席时
+   * 侧聊走直连腿（directNativeLeg），legacy 路径一律先判空）。
+   */
+  betterSidebar?: BetterSidebarService
+  sessions: SessionsService
+  workspaces: WorkspacesService
+  connection: ConnectionService
+  locale: LocaleService
+}
+
+// ── sidechat 扩展（WI-01）───────────────────────────────────────────────────
+// 下列声明经接口合并补进上方镜像；权威来源逐节标注。
+
+/**
+ * 会话列表快照补全（权威：dsh-client-runtime
+ * lib/types/client/sessions/service.d.ts 的 SessionListState）：
+ * phase 标「首次成功拉取」就绪边；byId 含已归档行（归档过滤在
+ * workspace UI 层，store 本身携带全部行）。
+ */
+export interface SessionListSnapshot {
+  phase?: 'pending' | 'ready'
+  byId?: Record<string, { blank?: boolean } | undefined>
+}
+
+/**
+ * 会话快照补全（权威：dsh-client-runtime sessions/conversation.d.ts）：
+ * openState 是历史窗口生命周期（cold = 未开窗口）；partial/runningCalls
+ * 承载在途流式输出。面板折叠函数对三者全部容错（缺省按空处理）。
+ */
+export interface ConversationSnapshot {
+  openState?: 'cold' | 'loading' | 'open' | 'error'
+  partial?: unknown
+  runningCalls?: readonly unknown[]
+  /** 待处理交互（审批/提问；R8 提示条用——原生接管链不渲染在侧栏）。 */
+  pending?: readonly unknown[]
+}
+
+/**
+ * input 草稿机的 state store（权威：dsh-client-ui-conversation
+ * input/contract.d.ts 的 SessionInput.state）——完整声明见下方 annotate 扩展节
+ * （接口合并；draft 字段两侧都依赖）。
+ */
+
+export interface Context {
+  /**
+   * 惰性非追踪服务读（运行时事实：context proxy 的 reflect.get）——
+   * 读取不在 inject 清单里的服务（conversation / commandUi）的唯一通道。
+   * （`ctx.effect` 无需镜像：公开 cordis 包的 fiber.d.ts 已通过接口合并
+   * 提供 `effect(execute, label?)`。）
+   */
+  get(name: string): unknown
+}
+
+// ── annotate 扩展 ────────────────────────────────────────────────────────────
+// Mirrors consumed by src/client/annotate/** (Workitem 02). Authorities:
+// - slots service: `@deepseek-ai/dsh-client-runtime` lib/types/client/slots.d.ts
+//   (SlotRegistry; register/inject) + `@deepseek-ai/dsh-client-ui-slots` index.d.ts
+// - input.dock owner share: `@deepseek-ai/dsh-client-ui-conversation`
+//   lib/types/client/contract/slots.d.ts (`conversation.input.dock` → InputZone)
+// - SessionInput: `.../lib/types/client/input/contract.d.ts`
+
+/** Registration options subset passed to `ctx.slots.register` (same shape better-sidebar mirrors). */
+export interface SlotRegisterOptions {
+  name: KnownSlotKey
+  key?: string
+  id?: string
+  order?: number
+  label?: string | (() => string)
+  select?: (owner: unknown) => unknown
+  priority?: number
+  locale?: string
+  registrant?: string
+  inject?: (...args: unknown[]) => Record<string, unknown>
+  children?: Record<string, unknown>
+}
+
+/**
+ * 我们用到的 slot 键的字面量联合（真实类型是 keyof SlotMap & string）——
+ * 收窄为显式清单：拼错编译期即红；启用新槽位 = 先在这里加一行（刻意的
+ * 显式 opt-in，arch-audit §4.1-4 修法）。
+ */
+export type KnownSlotKey =
+  | 'sidebar.workspaces'
+  | 'conversation.input.dock'
+  | 'conversation.session.header.utilities'
+  | 'settings.general.item'
+  | 'settings.section'
+  | 'settings.section.icon'
+  | 'sidebar.right.pane.tab'
+  | 'sidebar.right.pane.tab.title'
+  | 'sidenote.conversation'
+  | 'conversation.view'
+  | 'conversation.chat.node'
+  | 'conversation.chat.turnTail'
+  | 'conversation.chat.assistant-actions'
+  | 'conversation.composer.bar'
+  | 'conversation.user.text.node'
+  | 'conversation.chat.text-interaction'
+
+/** The client slots service face (register returns the disposer). */
+export interface SlotsService {
+  register(options: SlotRegisterOptions, component: unknown): () => void
+  /** Run a callback for each declaration lifetime of a slot (no-op while undeclared). */
+  inject(key: KnownSlotKey, callback: () => (() => void) | void): () => void
+}
+
+/** Published composer input state (subset of the real InputState). */
+export interface InputStateSnapshot {
+  readonly draft: string
+  /** 输入机相位（权威：input/contract.d.ts InputState.phase 字面量联合）。 */
+  readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'
+  /** 单调草稿版本号（斜杠/@ 触发的 pick 时 CAS 用——input/contract.d.ts）。 */
+  readonly draftRev?: number
+  /** 待发图片附件 id 列（DraftAttachmentId——附件 rail 用）。 */
+  readonly imageIds?: readonly string[]
+  /** Newer hosts renamed image-only drafts to general attachments. */
+  readonly attachmentIds?: readonly string[]
+  readonly occurrences?: readonly { occurrenceId: number; offset: number; length: number; source: string; ref: string }[]
+  readonly queue?: readonly unknown[]
+}
+
+/** Session input snapshot as exposed on `InputZone.input`. */
+export interface ConversationSnapshotLite {
+  sessionId: SessionId
+  running: boolean
+}
+
+/** Owner share of the `conversation.input.dock` slot (point-in-time snapshots). */
+export interface InputZone {
+  readonly session: ConversationSnapshotLite
+  readonly input: InputStateSnapshot
+}
+
+/**
+ * U+FFFC reference-chip insert (spike result: NOT used — serialization of the
+ * chip routes through the source owner's ReferenceCodec, which is
+ * package-internal to ui-input-trigger with no plugin-facing registry; an
+ * unowned source would mark the occurrence invalid and fail submit. Mirrored
+ * here only to document the probe target).
+ */
+export interface ReferenceInsert {
+  readonly source: string
+  readonly ref: string
+  readonly label: string
+  readonly clipboardText: string
+}
+
+export interface TokenSpan {
+  readonly start: number
+  readonly end: number
+  readonly draftRev: number
+}
+
+export interface Context {
+  /** The slot registry (provided by dsh-client-runtime, mounted before this plugin). */
+  slots: SlotsService
+}
+
+// ── DSH 原生右栏（dsh-client-ui-sidebar-right，0.1.5-rc.1+）─────────────────
+// 权威：<dsh install>/node_modules/@deepseek-ai/dsh-client-ui-sidebar-right/
+// lib/types/client/{service,tab-registry,contract/slots,tab-info}.d.ts。
+// 这些面不进 inject 数组（optional——缺席即走 legacy 腿），一律 ctx.get 探测。
+
+/** 原生 tab 类型注册表（ctx.sidebarRightTabs）。 */
+export interface NativeTabRegistry {
+  register(definition: NativeTabDefinition): () => void
+}
+
+export interface NativeTabDefinition {
+  multiple?: boolean
+  keepMounted?: boolean
+  /** 实现 id（槽 key），跨注册唯一——用包名前缀防碰撞。 */
+  id: string
+  /** 类型判别符：`openTab(kind)` 依此打开。 */
+  kind: string
+  patterns?: readonly string[]
+  priority?: 'extension' | 'builtin' | 'fallback'
+  canOpen?: (address: string) => boolean
+  /** tab 芯片初始文案，open 时被捕获进布局记录。 */
+  title: (address: string) => string
+  guide?: readonly NativeGuideEntry[]
+}
+
+export interface NativeGuideEntry {
+  order: number
+  title: () => string
+  description?: () => string
+  icon?: unknown
+}
+
+/** 原生 tab 记录（tab-info.d.ts 的 TabRecord 子集镜像）。 */
+export interface NativeTabRecord {
+  id: string
+  kind: string
+  title: string
+  contentId?: string
+  visible: boolean
+  navigation: { address: string, params?: unknown, revision?: number }
+  /**
+   * record 消失（tab 关闭）或插件卸载时 abort（权威：contract/slots.d.ts
+   * SidebarRightTabInfo.tab.signal——必填；标可选会让关闭检测在形态漂移时
+   * 静默失效）。
+   */
+  readonly signal: AbortSignal
+  /** Bound to this occurrence's session, including after the main view switches. */
+  readonly actions: { close(): void }
+}
+
+/** useTabInfo() 的返回（槽框架注入的 tab 信息 hook）。 */
+export interface NativeTabInfo {
+  tab: NativeTabRecord
+  [key: string]: unknown
+}
+
+/** 槽框架加到每个 tab body/title 组件上的 props。 */
+export interface NativeTabFrameworkProps {
+  useTabInfo: () => NativeTabInfo
+}
+
+/** Native right-sidebar controller. tabsIn/active describe layout membership,
+ * including not-yet-mounted bodies; tab signals arrive through the body slot. */
+export interface SidebarRightService {
+  openTab(kind: string, options?: { paneId?: string, replaceTab?: string, revealIfOpened?: boolean, params?: unknown }): void
+  close(tabId: string): void
+  isExpanded(): boolean
+  toggleExpanded(): void
+  focus(tabId: string): void
+  active?(): Pick<NativeTabRecord, 'id' | 'kind' | 'title' | 'contentId'> | undefined
+  tabsIn?(sessionId: string): readonly Pick<NativeTabRecord, 'id' | 'kind' | 'title' | 'contentId'>[]
+}
+
+
+/** SessionInput completion for annotate: the live state store + the (unused) chip insert face. */
+export interface SessionInput {
+  /** Input state store (draft reads + subscribe for the send-edge watch). */
+  readonly state: ObservableSnapshot<InputStateSnapshot>
+  /** Spike-only mirror; see {@link ReferenceInsert}. Not called by annotate. */
+  insertReference(ref: ReferenceInsert, span: TokenSpan): boolean
+  /** 图片附件（WI-02 附件 rail；busy 相位机器拒收返 false）。 */
+  addImages?(ids: readonly string[]): boolean
+  removeImage?(id: string): void
+  addAttachments?(ids: readonly string[]): boolean
+  removeAttachment?(id: string): boolean
+  /** Scoped insert-text implementation; verified against actual input shells. */
+  insertText?(text: string, span: TokenSpan, keepCompleting?: boolean): boolean
+  readonly notices?: ObservableSnapshot<{ level: 'info' | 'error'; text: string; seq: number } | null>
+}

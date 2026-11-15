@@ -1,0 +1,178 @@
+/**
+ * Selection capture layer (Workitem 02): document-level listeners validate
+ * the live selection and publish the latest valid one to the floating
+ * toolbar through a small external-store controller. Mirrors the
+ * production-proven dsh-sidebar-qa contract, narrowed to assistant messages:
+ *
+ * - completed reply bodies in one view and Turn may be selected together;
+ * - selected visible process/tool UI invalidates the whole selection;
+ * - `[data-streaming]` messages (still streaming) are excluded;
+ * - explicit side assistant bodies are admitted; other sidebar/plugin UI is
+ *   excluded; every selected reply belongs to the same source view;
+ * - quote text is kept complete, while anchor offsets use one DOM projection.
+ *
+ * These are DSH-internal DOM attributes rather than a public contract — an
+ * upstream redesign silently degrades the feature (no popup), never crashes.
+ */
+
+import { quoteSourcesOfRange, quoteRangeOf, projectedRangeText, selectedQuoteText, sourceKey, type QuoteSource } from '../annotations/source.ts'
+import type { AnnotationAnchor } from '../annotations/model.ts'
+
+/** One validated selection, ready for the toolbar. */
+export interface SelectionSnapshot {
+  /** 引用全文（发送给模型/存储；不截断——用户裁定 2026-09-06）。 */
+  readonly text: string
+  /** Full selection text (re-anchor needle). */
+  readonly anchorText: string
+  /** `data-chat-anchor-key` of the owning message, when present. */
+  readonly anchorKey: string | undefined
+  /** 0-based ordinal of this selection among identical texts in the anchor. */
+  readonly occurrence: number
+  readonly anchors?: readonly AnnotationAnchor[]
+  /** Bounding box for toolbar placement. */
+  readonly rect: { readonly left: number; readonly top: number; readonly width: number }
+  /** A live clone of the selection range (badge anchor until re-render). */
+  readonly range: Range
+  readonly ranges: readonly Range[]
+  readonly sessionId: string
+  readonly source: QuoteSource
+}
+
+export interface SelectionState {
+  readonly selection: SelectionSnapshot | null
+}
+
+/**
+ * The 0-based ordinal of the selection's text among its occurrences in the
+ * anchor element — the disambiguator for repeated phrases (re-anchor key).
+ */
+export function occurrenceOf(anchor: HTMLElement, range: Range, text: string): number {
+  try {
+    const pre = document.createRange()
+    pre.selectNodeContents(anchor)
+    pre.setEnd(range.startContainer, range.startOffset)
+    const before = projectedRangeText(anchor, pre)
+    let occurrence = 0
+    let at = before.indexOf(text)
+    while (at !== -1) {
+      occurrence += 1
+      at = before.indexOf(text, at + text.length)
+    }
+    return occurrence
+  } catch {
+    return 0
+  }
+}
+
+/** Capture and validate the current window selection, or null when invalid. */
+export function captureSelection(currentSessionId: string): SelectionSnapshot | null {
+  const sel = window.getSelection()
+  if (sel === null || sel.isCollapsed || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  const sources = quoteSourcesOfRange(range, currentSessionId)
+  if (!sources) return null
+  const ranges = sources.map(source => quoteRangeOf(source.body, range))
+  if (ranges.some(fragment => fragment === null)) return null
+  const fragments = ranges as Range[]
+  const anchors = sources.map((source, index) => {
+    const anchorText = projectedRangeText(source.body, fragments[index]!)
+    return { anchorKey: sourceKey(source), anchorText, occurrence: occurrenceOf(source.body, fragments[index]!, anchorText) }
+  })
+  const source = sources[0]!
+  const anchorText = anchors.map(anchor => anchor.anchorText).join('')
+  if (anchorText.trim() === '') return null
+  const browserText = sel.toString()
+  const text = browserText.replace(/\s/g, '') === anchorText.replace(/\s/g, '') ? browserText
+    : fragments.map((fragment, index) => selectedQuoteText(fragment, fragment.toString(), anchors[index]!.anchorText)).join('\n\n')
+  const rect = range.getBoundingClientRect()
+  return {
+    text,
+    anchorText,
+    anchorKey: sourceKey(source),
+    occurrence: anchors[0]!.occurrence,
+    ...(anchors.length > 1 ? { anchors } : {}),
+    rect: { left: rect.left, top: rect.top, width: rect.width },
+    range: range.cloneRange(),
+    ranges: fragments,
+    sessionId: source.sessionId,
+    source,
+  }
+}
+
+export interface SelectionController {
+  getSnapshot(): SelectionState
+  subscribe(fn: () => void): () => void
+  clear(): void
+  dispose(): void
+}
+
+/** Debounce for selectionchange (ms). */
+const DEBOUNCE_MS = 200
+
+/** Create one selection controller (call once per plugin activation). */
+export function createSelectionController(getSessionId: () => string): SelectionController {
+  let selection: SelectionSnapshot | null = null
+  const listeners = new Set<() => void>()
+  let debounceTimer: number | undefined
+
+  // useSyncExternalStore requires a STABLE snapshot reference between
+  // notifications — a fresh object each call would loop React.
+  let state: SelectionState = { selection: null }
+
+  const notify = (): void => {
+    state = { selection }
+    for (const fn of [...listeners]) fn()
+  }
+
+  const recompute = (): void => {
+    let next: SelectionSnapshot | null = null
+    try {
+      next = captureSelection(getSessionId())
+    } catch {
+      next = null
+    }
+    const changed = (selection === null) !== (next === null)
+      || (selection !== null && next !== null && (
+        selection.anchorText !== next.anchorText
+        || selection.anchorKey !== next.anchorKey
+        || selection.occurrence !== next.occurrence
+        || JSON.stringify(selection.anchors) !== JSON.stringify(next.anchors)
+        || selection.sessionId !== next.sessionId
+        || selection.source.view !== next.source.view
+        || selection.source.surface !== next.source.surface
+        || selection.rect.top !== next.rect.top
+        || selection.rect.left !== next.rect.left
+        || selection.rect.width !== next.rect.width
+      ))
+    if (!changed) return
+    selection = next
+    notify()
+  }
+
+  const onSelectionChange = (): void => {
+    if (debounceTimer !== undefined) window.clearTimeout(debounceTimer)
+    debounceTimer = window.setTimeout(recompute, DEBOUNCE_MS)
+  }
+
+  document.addEventListener('selectionchange', onSelectionChange)
+  document.addEventListener('mouseup', recompute)
+  document.addEventListener('keyup', onSelectionChange)
+
+  return {
+    getSnapshot: () => state,
+    subscribe(fn: () => void): () => void {
+      listeners.add(fn)
+      return () => { listeners.delete(fn) }
+    },
+    clear(): void {
+      selection = null
+      notify()
+    },
+    dispose(): void {
+      document.removeEventListener('selectionchange', onSelectionChange)
+      document.removeEventListener('mouseup', recompute)
+      document.removeEventListener('keyup', onSelectionChange)
+      if (debounceTimer !== undefined) window.clearTimeout(debounceTimer)
+    },
+  }
+}

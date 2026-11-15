@@ -1,0 +1,98 @@
+/**
+ * 「最近关闭的侧边聊天」登记处（L1，localStorage 按主会话分键）：
+ * D3 后悔药之一——× 即焚观感不变，但关掉的可重开。
+ *
+ * 容量：每个主会话最多记 5 条（新者在前）；会话本体仍 archived 在盘
+ * （× 只关 Tab），重开 = 开 Tab + meta 预置 childId（面板绑定而非 fork）。
+ */
+import { parseSideChatMeta, type SideChatMeta } from './model.ts'
+
+export interface ClosedSideEntry {
+  readonly childId: string
+  readonly parentSessionId: string
+  readonly title: string
+  /** 内容身份（Delivery_05）：首条消息摘要；老条目缺省，菜单回退 title。 */
+  readonly topic?: string
+  readonly closedAt: number
+  /** Native tab recovery identity; manual reopen continues to use childId. */
+  readonly tabId?: string
+  readonly savedMeta?: SideChatMeta & { number?: number }
+}
+
+const KEY_PREFIX = 'dsh-sidenote:closed-side:v1:'
+const CAP = 5
+
+function readAll(storageKey: string): ClosedSideEntry[] {
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (raw === null) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((e): e is ClosedSideEntry =>
+      typeof e === 'object' && e !== null
+      && typeof (e as ClosedSideEntry).childId === 'string'
+      && typeof (e as ClosedSideEntry).parentSessionId === 'string'
+      && typeof (e as ClosedSideEntry).title === 'string')
+  } catch {
+    return []
+  }
+}
+
+export function recordClosedSideChat(parentSessionId: string, entry: ClosedSideEntry): void {
+  try {
+    const key = KEY_PREFIX + parentSessionId
+    const list = [entry, ...readAll(key).filter(e => e.childId !== entry.childId)].slice(0, CAP)
+    localStorage.setItem(key, JSON.stringify(list))
+  } catch {
+    // 隐私模式/写失败：后悔药缺席不影响主流程。
+  }
+}
+
+/** Share the recovery payload between pagehide and true native-tab closure. */
+export function rememberSideChat(tabId: string, title: string, meta: unknown): void {
+  const current = parseSideChatMeta(meta)
+  if (!current.childId || !current.parentSessionId) return
+  recordClosedSideChat(current.parentSessionId, {
+    childId: current.childId, parentSessionId: current.parentSessionId, tabId, title,
+    savedMeta: { ...current, number: (meta as { number?: number }).number },
+    ...(current.topic ? { topic: current.topic } : {}), closedAt: Date.now(),
+  })
+}
+
+/** 读某主会话的最近关闭列表（新者在前）。 */
+export function listClosedSideChats(parentSessionId: string): readonly ClosedSideEntry[] {
+  if (typeof localStorage === 'undefined') return []
+  return readAll(KEY_PREFIX + parentSessionId)
+}
+
+/** Existing recovery records can seed the durable visibility index on upgrade. */
+export function allClosedSideChats(): readonly ClosedSideEntry[] {
+  try {
+    return Object.keys(localStorage).filter(key => key.startsWith(KEY_PREFIX)).flatMap(readAll)
+  } catch { return [] }
+}
+
+/** 重开消费：从列表移除（重开后若再关会重新入列）。 */
+export function dropClosedSideChat(parentSessionId: string, childId: string): void {
+  try {
+    const key = KEY_PREFIX + parentSessionId
+    const list = readAll(key).filter(e => e.childId !== childId)
+    if (list.length === 0) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(list))
+  } catch { /* ignore */ }
+}
+
+/** A newly opened native occurrence may reuse a tab id. Keep manual history,
+ * but revoke that old occurrence's automatic restoration identity. */
+export function forgetClosedTabBinding(parentSessionId: string, tabId: string): void {
+  try {
+    const key = KEY_PREFIX + parentSessionId
+    const entries = readAll(key)
+    if (!entries.some(entry => entry.tabId === tabId)) return
+    localStorage.setItem(key, JSON.stringify(entries.map(entry => {
+      if (entry.tabId !== tabId) return entry
+      const { tabId: _oldTab, ...rest } = entry
+      return rest
+    })))
+  } catch { /* Manual reopen remains best-effort when storage is unavailable. */ }
+}

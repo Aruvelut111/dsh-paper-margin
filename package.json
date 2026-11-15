@@ -1,7 +1,7 @@
 {
   "name": "dsh-paper-margin",
-  "version": "2.5.7",
-  "description": "Read files in the DSH sidebar, annotate selected text, and send notes with your next message.",
+  "version": "2.5.8",
+  "description": "Read, annotate and discuss files and webpages in DeepSeek Harness. Includes sidebar chat and batch annotation sending in one plugin.",
   "type": "module",
   "license": "MIT",
   "main": "lib/index.js",
@@ -19,7 +19,9 @@
     "THIRD_PARTY_NOTICES.txt",
     "README_EN.md",
     "licenses",
-    "docs/reader-bridge.md"
+    "docs/reader-bridge.md",
+    "lib/migrate-profile.cjs",
+    "docs/integration.md"
   ],
   "engines": {
     "node": ">=24.9.0",
@@ -30,7 +32,13 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
   },
   "dshSupport": {
@@ -59,7 +67,14 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.1",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.1",
+    "cordis": "^4.0.0-rc.7",
+    "lightningcss": "^1.32.0",
+    "yaml": "^2.8.1"
   },
   "author": "Aruvelut",
   "repository": {

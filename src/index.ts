@@ -2,7 +2,7 @@
  * Host half: the citation guide each chat's system prompt receives, and the
  * settings schema the settings card writes.
  *
- * There is deliberately NO HTTP route here. The reader obtains bytes through
+ * The reader obtains bytes through
  * the host's own `remote.workspaceFiles` Remote (injected in the client half),
  * which is the same primitive the built-in preview uses. An earlier design
  * served bytes over a private signed route; it needed its own key file, trust
@@ -11,6 +11,7 @@
  * modes with it.
  */
 import { applyCitationGuide } from './host/citation-guide'
+import { apply as applySidenoteHost } from './integrations/sidenote/index'
 
 export const name = 'dsh-paper-margin'
 
@@ -22,6 +23,9 @@ import z from '@deepseek-ai/schemastery'
 
 export const Config = z.object({
   directSubmit: z.boolean().default(false).volatile(),
+  hideNativeQuote: z.boolean().default(true).volatile(),
+  showSideChatNote: z.boolean().default(true).volatile(),
+  finalRepliesDefaultAttempted: z.boolean().default(false).volatile(),
 })
 
 /** Structural face of the host context this half touches. */
@@ -32,6 +36,8 @@ interface HostContext {
 }
 
 export function apply(ctx: HostContext): void {
+  // The chat projection and legacy reflow route are part of this same plugin.
+  applySidenoteHost(ctx)
   // Each chat's system prompt learns the citation format; the client turns
   // [main.pdf p.7 "words"] into jumps. Best effort per chat.
   try {

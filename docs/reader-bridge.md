@@ -1,6 +1,6 @@
 # 阅读批注接口
 
-Paper Margin 捕获原文和来源，配套 sidenote 管理注释、草稿和发送。两个插件通过同一页面的 `CustomEvent` 交换数据。
+Paper Margin 的阅读模块捕获原文和来源，包内注释模块管理草稿、持久化和发送。模块通过同一页面的 `CustomEvent` 交换数据；事件名保留历史 sidenote 标识以兼容已保存记录和打开的客户端。无需另装配套插件。
 
 事件名：`dsh-sidenote:external-annotation:v1`。
 

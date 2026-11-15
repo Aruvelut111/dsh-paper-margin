@@ -13,7 +13,7 @@
 
 待发送选区显示蓝色高亮和 1、2、3… 编号。编号按会话和批次排列，删除后补齐。发送成功后清除原文标记，已发内容从消息的「批注 ×N」回看。切换文件、会话和刷新保留未发送注释；关闭侧栏时收起高亮与浮窗。
 
-侧边聊天由 sidenote 提供，其中的划选加入该侧聊的输入框，随该侧聊发送。主会话与侧聊各自编号、保存和发送。
+插件内置侧边聊天，其中的划选加入该侧聊的输入框，随该侧聊发送。主会话与侧聊各自编号、保存和发送。
 
 ## 安装
 
@@ -24,33 +24,24 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/install.ps1 | iex
 ```
 
-脚本自动找到 DSH、下载并校验两个安装包，再调用官方插件安装命令。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
+脚本下载并校验一个完整安装包，调用官方插件安装命令。旧双包用户也用这条命令升级：脚本会备份配置、移除旧配套包并保留注释和侧聊记录。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
 
-已有 `dsh` 命令的终端可直接安装，无需手动下载：
+### 新安装或手动下载
+
+首次安装可直接使用单个 URL：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-paper-margin-2.5.7.tgz https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.7/dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.8/dsh-paper-margin-2.5.8.tgz --ignore-scripts --save-exact
 ```
 
-Web 版将 `desktop` 改成 `web`。
+Web 版将 `desktop` 改成 `web`。Windows Web 版升级可下载脚本后运行 `./install.ps1 -Profile web`。
 
-### 手动安装
+也可从 [v2.5.8 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.8) 下载 **`dsh-paper-margin-2.5.8.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
 
-从 [v2.5.7 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.7) 下载两个文件：
-
-- `dsh-paper-margin-2.5.7.tgz`
-- `dsh-sidenote-0.8.5-reader.5.tgz`
-
-在 DSH 的「插件 → 添加插件」中安装这两个包，然后重启。已有 sidenote 时，配套包替换同名插件，保留原有侧聊和本地注释。它是基于 [g-yixuan/dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的阅读集成分支，源码在 [Aruvelut111/dsh-sidenote](https://github.com/Aruvelut111/dsh-sidenote/tree/fix/external-reader-annotations)。
-
-CLI 也可以安装；文件路径按下载位置填写：
-
-```sh
-dsh plugin --profile desktop add ./dsh-paper-margin-2.5.7.tgz ./dsh-sidenote-0.8.5-reader.5.tgz --ignore-scripts --save-exact
-```
+旧版分包安装请使用上面的一键脚本，以同时迁移旧 entry 覆盖项。配置迁移和来源见 [集成说明](docs/integration.md)。
 
 ## 文件支持
 
@@ -78,12 +69,12 @@ npm run check
 npm pack
 ```
 
-`check` 运行模块边界、类型、构建和单元测试。测试包含可独立运行的 sidenote 协议快照。真实宿主验证过侧栏关闭、双会话编号与发送隔离、删除重排及刷新恢复。
+`check` 运行模块边界、类型、构建和单元测试。测试直接覆盖包内注释源码、阅读协议和旧 profile 迁移。真实宿主验证过侧栏关闭、双会话编号与发送隔离、删除重排及刷新恢复。
 
 PDF 本地读取检查：`npm run verify:open -- /path/to/book.pdf`。
 
 ## 项目与许可
 
-Paper Margin 负责文件捕获和定位，配套 sidenote 负责注释清单、持久化及原生发送事务。原生查看器仍可从打开方式菜单选择。注释保存在当前浏览器站点的 localStorage，清除站点数据会删除本地注释。
+Paper Margin 内置文件阅读、文字定位、注释清单、持久化、原生发送事务和侧聊。原生查看器仍可从打开方式菜单选择。注释保存在当前浏览器站点的 localStorage，清除站点数据会删除本地注释。
 
 项目使用 [MIT](LICENSE) 许可证。感谢 [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的注释与侧聊实现、[dsh-cite-lens](https://github.com/adithyanraj03/dsh-cite-lens) 的引用定位算法，以及 PDF.js、DOMPurify、Schemastery 和 Cosmokit。来源、改编范围和许可证见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。

@@ -13,7 +13,8 @@
 import { build } from 'esbuild'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { join, dirname } from 'node:path'
+import { join, relative } from 'node:path'
+import { transform } from 'lightningcss'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -37,6 +38,14 @@ await build({
   logLevel: 'info',
 })
 
+await build({
+  absWorkingDir: root,
+  entryPoints: ['src/migrate-profile.ts'],
+  outfile: 'lib/migrate-profile.cjs',
+  bundle: true, format: 'cjs', platform: 'node', target: 'node24',
+  logLevel: 'info',
+})
+
 const result = await build({
   absWorkingDir: root,
   entryPoints: ['src/client/index.ts'],
@@ -44,14 +53,34 @@ const result = await build({
   format: 'cjs',
   platform: 'browser',
   target: 'es2022',
-  external: ['react', 'react-dom'],
+  external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives', 'cordis'],
+  plugins: [{
+    name: 'inline-css-modules',
+    setup(plugin) {
+      plugin.onLoad({ filter: /\.module\.css$/ }, ({ path }) => {
+        const filename = relative(root, path).replaceAll('\\', '/')
+        const { code, exports } = transform({ filename, code: readFileSync(path), cssModules: { pattern: '[hash]_[local]' }, minify: true })
+        // The native transformer returns map keys in varying order. Stabilize
+        // code generation so independent builds produce the same client bytes.
+        const classes = Object.fromEntries(Object.entries(exports ?? {}).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => [key, value.name]))
+        return { loader: 'js', contents: `
+          const key = ${JSON.stringify(id + '/' + filename)};
+          if (!document.querySelector('style[data-plugin-css=' + JSON.stringify(key) + ']')) {
+            const style = document.createElement('style'); style.dataset.pluginCss = key;
+            style.textContent = ${JSON.stringify(code.toString())}; document.head.append(style);
+          }
+          export default ${JSON.stringify(classes)};
+        ` }
+      })
+    },
+  }],
   loader: { '.css': 'text' },
   minify: true,
   legalComments: 'none',
   write: false,
   logLevel: 'error',
   supported: { 'top-level-await': false },
-  define: { 'process.env.NODE_ENV': '"production"' },
+  define: { 'process.env.NODE_ENV': '"production"', __SIDENOTE_VERSION__: JSON.stringify(manifest.version) },
 })
 
 const worker = readFileSync(join(root, 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs'), 'utf8')

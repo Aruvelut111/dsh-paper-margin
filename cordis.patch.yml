@@ -1,4 +1,5 @@
-# Add the reader only. Native file limits and other host settings stay owned by DSH.
+# One integrated entry. Retain the historical id for existing chat preferences.
+# Native file limits and other host settings stay owned by DSH.
 - insert:
-    - id: paper-margin
+    - id: side-chat
       name: 'dsh-paper-margin'
