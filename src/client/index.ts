@@ -20,6 +20,7 @@ import { createAnnotation } from './annotate/model'
 import { provideStore } from './annotate/store'
 import { installNotebook } from './annotate/notebook'
 import { attachWebAnnotations } from './annotate/web'
+import { attachNativePageReader } from './browser/bridge'
 import { createMarginPreferences } from './preferences'
 import { registerMarginSettings } from './settings'
 import { currentSessionId } from './protocol/composer'
@@ -77,6 +78,7 @@ function applyInner(ctx: unknown): void {
   } catch { /* sessions not ready: citations resolve without a session */ }
 
   applyPreview(ctx as never, registry)
+  c.effect?.(() => attachNativePageReader(), 'dsh-paper-margin: native page reader')
 
   // Settings card controls the standalone direct-send button visibility.
   // configForms is read through ctx.get (sidenote's pattern): the settings
@@ -135,7 +137,7 @@ function applyInner(ctx: unknown): void {
         const file = captured.file || labelOf(captured)
         const sessionId = captured.sessionId
         if (!sessionId) return '无法确定目标会话，未添加；请重新打开文件'
-        if (captureInSidenote({ id: captured.id, sessionId, text: captured.quote, note: captured.note, source: { label: `${file}${captured.where ? ` · ${captured.where}` : ''}`, address: captured.sourceAddress, page: captured.page, anchor: captured.anchor }, point: captured.point, edit: captured.kind !== 'web' && captured.note === undefined })) return undefined
+        if (captureInSidenote({ id: captured.id, sessionId, text: captured.quote, note: captured.note, source: { label: `${file}${captured.where ? ` · ${captured.where}` : ''}`, address: captured.sourceAddress, page: captured.page, anchor: captured.anchor, browserPageId: captured.browserPageId }, point: captured.point, edit: captured.kind !== 'web' && captured.note === undefined })) return undefined
         if (sidenoteAvailable()) return '批注正在发送，请稍后重试'
         const key = `surface:${sessionId}:${captured.sourceAddress || captured.kind}`
         const id = captured.id || `pm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -145,6 +147,7 @@ function applyInner(ctx: unknown): void {
           file,
           sessionId,
           sourceAddress: captured.sourceAddress,
+          browserPageId: captured.browserPageId,
           page: captured.page ?? 0,
           quote: captured.quote,
           note: captured.note,

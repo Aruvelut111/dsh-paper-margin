@@ -20,7 +20,7 @@ Add passages from several files or webpages to the same conversation's pending b
 
 A message includes selected excerpts, comments, and source locators. File citations also include a decoded host path. The Agent receives guidance to read additional context with its existing tools when needed; PDF and Office files require an available document parser or converter. Relative paths belong to the source session's workspace. A locator does not grant file access.
 
-Web citations include selected text and a URL, not the logged-in page's full text or a screenshot. A separate fetch may use different login state, dynamic content, or page versions than the sidebar.
+Web citations include selected text, the URL and a native page ID. When more context is needed, the bundled `paper_margin_browser` tool reads the same open page with its existing login state and dynamic content. It can find a quoted passage or read further portions, with a timestamp, scope and content version. Reads cover loaded main-document text; images, Canvas, embedded frames and unloaded content are excluded. See [native page reading](docs/native-browser.md).
 
 ## Install
 
@@ -29,7 +29,7 @@ Supports DSH 0.2.2; tested with 0.2.2-rc.1.
 On Windows, quit DSH and run in PowerShell:
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/install.ps1 | iex
 ```
 
 The [installer](scripts/install.ps1) downloads and verifies one complete package, then uses the official DSH plugin command. For older two-package installations, it backs up profile metadata, removes the former companion package and migrates its settings. Existing notes and side chats keep their storage identities. Restart DSH afterward.
@@ -37,12 +37,12 @@ The [installer](scripts/install.ps1) downloads and verifies one complete package
 For a fresh installation with `dsh` on PATH:
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/dsh-paper-margin-2.5.9.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/dsh-paper-margin-2.6.0.tgz --ignore-scripts --save-exact
 ```
 
 For Web, replace `desktop` with `web`. On Windows, download the installer and run `./install.ps1 -Profile web` to upgrade a Web profile.
 
-For manual installation, download **`dsh-paper-margin-2.5.9.tgz`** from [v2.5.9](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.9) and add that single file through DSH Plugins. The reader, webpage annotations, annotation list and side chat are all included. Older split installations should use the installer to migrate the former profile entries too.
+For manual installation, download **`dsh-paper-margin-2.6.0.tgz`** from [v2.6.0](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.6.0) and add that single file through DSH Plugins. The reader, webpage annotations, annotation list and side chat are all included. Older split installations should use the installer to migrate the former profile entries too.
 
 See [integration details](docs/integration.md) for source attribution and upgrade behavior.
 
@@ -64,10 +64,10 @@ npm run check
 npm pack
 ```
 
-The check covers architecture, types, build, and unit tests, including the integrated annotation runtime and profile migration. Host checks cover sidebar cleanup, numbering and payload isolation between two conversations, deletion, and reload recovery.
+The check covers architecture, types, build, and unit tests, including the integrated annotation runtime and profile migration. Host checks cover sidebar cleanup, numbering and payload isolation between two conversations, deletion, and reload recovery. Native-page checks also cover logged-in dynamic content, exact search, navigation guards and conversation isolation.
 
 Notes use localStorage in the current browser origin. Clearing site data removes them.
 
 ## License
 
-[MIT](LICENSE). Paper Margin uses the annotation lifecycle from [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote), an adapted quote search from [dsh-cite-lens](https://github.com/adithyanraj03/dsh-cite-lens), PDF.js, DOMPurify, Schemastery, and Cosmokit. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for attribution and included licenses.
+[MIT](LICENSE). Paper Margin uses the annotation lifecycle from [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote), quote search from [dsh-cite-lens](https://github.com/adithyanraj03/dsh-cite-lens), native-page bridge ideas from [dsh-browser-bridge](https://github.com/alvinlui-hk/dsh-browser-bridge) and [dsh-sidebar-browser-agent](https://github.com/Hesitate-P/dsh-sidebar-browser-agent), PDF.js, DOMPurify, Schemastery, and Cosmokit. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for attribution and included licenses.

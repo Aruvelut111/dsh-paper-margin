@@ -37,6 +37,7 @@ import { captureTextAnchor, type TextAnchor } from './text-anchor'
 import { readerSessionId, readerSurfaceVisible, observeReaderVisibility } from './reader-surface'
 
 export interface CapturedSelection {
+  browserPageId?: string
   anchor?: TextAnchor
   point?: { x: number; y: number }
   note?: string

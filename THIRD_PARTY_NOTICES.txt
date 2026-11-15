@@ -463,6 +463,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
+dsh-browser-bridge, https://github.com/alvinlui-hk/dsh-browser-bridge; MIT.
+Reference: a9e719088d18e3d860f8b7ba471b22a5fa134f80.
+Native webview discovery and request/result bridge design adapted for the read-only reader in src/client/browser and src/host/browser*.ts.
+Full license: licenses/dsh-browser-bridge-MIT.txt.
+
+dsh-sidebar-browser-agent, https://github.com/Hesitate-P/dsh-sidebar-browser-agent; MIT.
+Reference: 5d2c4c9ae42b6473f609906c127228c61ee880aa.
+Native guest executeJavaScript, long-poll transport and initiating-session lookup informed the same reader. Control and screenshot actions are not included.
+Full license: licenses/dsh-sidebar-browser-agent-MIT.txt.
+
 dsh-cite-lens, https://github.com/adithyanraj03/dsh-cite-lens; MIT. Quote search adapted in src/client/protocol/textsearch.ts.
 
 MIT License

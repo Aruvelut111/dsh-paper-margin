@@ -11,6 +11,7 @@
  * modes with it.
  */
 import { applyCitationGuide } from './host/citation-guide'
+import { applyNativeBrowser } from './host/browser'
 import { apply as applySidenoteHost } from './integrations/sidenote/index'
 
 export const name = 'dsh-paper-margin'
@@ -38,6 +39,7 @@ interface HostContext {
 export function apply(ctx: HostContext): void {
   // The chat projection and legacy reflow route are part of this same plugin.
   applySidenoteHost(ctx)
+  applyNativeBrowser(ctx)
   // Each chat's system prompt learns the citation format; the client turns
   // [main.pdf p.7 "words"] into jumps. Best effort per chat.
   try {

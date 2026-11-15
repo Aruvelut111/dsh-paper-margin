@@ -2,6 +2,7 @@ import type { CapturedSelection } from './universal'
 import { documentNotes } from './document-notes'
 import type { TextAnchor } from './text-anchor'
 import { removeFromSidenote } from './sidenote'
+import { nativePageId } from '../browser/pages'
 import { readerSessionId, readerSurfaceVisible, observeReaderVisibility, observeReaderRoots } from './reader-surface'
 interface GuestItem { id: string; revision?: number; quote: string; note: string; url: string; title: string; image?: boolean; anchor?: TextAnchor; removeId?: number; remove?: boolean }
 interface GuestSaved { id: number; number: number; anchorText: string; note: string; state: string; externalCaptureId?: string; externalSource?: { anchor?: TextAnchor } }
@@ -165,7 +166,7 @@ export function attachWebAnnotations(onCapture: (capture: CapturedSelection) => 
       const sessionId = owner
       if (!sessionId) continue
       if (item.remove || item.removeId !== undefined) { if (removeFromSidenote(sessionId, item.removeId, item.id)) ids.push(item.id + ':' + (item.revision ?? 0)); continue }
-      const result = onCapture({ id: item.id, sessionId, kind: item.image ? 'image' : 'web', file: item.title || item.url, sourceAddress: item.url, quote: item.quote, note: item.note || '', anchor: item.anchor, where: item.image ? '网页图片' : '网页划选' }); if (typeof result !== 'string') ids.push(item.id + ':' + (item.revision ?? 0))
+      const result = onCapture({ id: item.id, sessionId, kind: item.image ? 'image' : 'web', file: item.title || item.url, sourceAddress: item.url, browserPageId: nativePageId(element), quote: item.quote, note: item.note || '', anchor: item.anchor, where: item.image ? '网页图片' : '网页划选' }); if (typeof result !== 'string') ids.push(item.id + ':' + (item.revision ?? 0))
     }
     return ids
   }

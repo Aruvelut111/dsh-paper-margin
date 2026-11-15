@@ -1,6 +1,6 @@
 {
   "name": "dsh-paper-margin",
-  "version": "2.5.9",
+  "version": "2.6.0",
   "description": "Read, annotate and discuss files and webpages in DeepSeek Harness. Includes sidebar chat and batch annotation sending in one plugin.",
   "type": "module",
   "license": "MIT",
@@ -21,7 +21,8 @@
     "licenses",
     "docs/reader-bridge.md",
     "lib/migrate-profile.cjs",
-    "docs/integration.md"
+    "docs/integration.md",
+    "docs/native-browser.md"
   ],
   "engines": {
     "node": ">=24.9.0",

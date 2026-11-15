@@ -29,7 +29,10 @@ export function parseFileAddress(address: string, currentSession = ''): { sessio
 }
 
 /** Keep the original reveal URL and expose its host path for existing tools. */
-export function sourceLocator(address: string, currentSession = ''): string {
+export function sourceLocator(address: string, currentSession = '', browserPageId?: string): string {
   const file = parseFileAddress(address, currentSession)
-  return `[Source: ${address}]` + (file ? `\n[File path: ${JSON.stringify(file.path)}]` + (/^(?:[A-Za-z]:[\\/]|\/)/.test(file.path) ? '' : `\n[Source session: ${JSON.stringify(file.sessionId)}]`) : '')
+  const source = `[Source: ${address}]`
+  if (file) return source + `\n[File path: ${JSON.stringify(file.path)}]` + (/^(?:[A-Za-z]:[\\/]|\/)/.test(file.path) ? '' : `\n[Source session: ${JSON.stringify(file.sessionId)}]`)
+  if (/^https?:\/\//i.test(address) && browserPageId) return source + `\n[Sidebar page: ${JSON.stringify(browserPageId)}]\n[Source session: ${JSON.stringify(currentSession)}]`
+  return source
 }

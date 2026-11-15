@@ -2,7 +2,7 @@ import type { Annotation, AnnotationStore } from './model.ts'
 
 /** Versioned same-document seam for readers. No globals or storage coupling. */
 export const EXTERNAL_ANNOTATIONS_EVENT = 'dsh-sidenote:external-annotation:v1'
-export interface ExternalSource { readonly label: string; readonly address?: string; readonly page?: number; readonly anchor?: { exact: string; start: number; prefix: string; suffix: string } }
+export interface ExternalSource { readonly label: string; readonly address?: string; readonly page?: number; readonly browserPageId?: string; readonly anchor?: { exact: string; start: number; prefix: string; suffix: string } }
 export interface ExternalCapture {
   id?: string
   sessionId: string
@@ -58,7 +58,7 @@ export function registerExternalAnnotations(store: AnnotationStore, open: (annot
       }
     }
     const anchor = item.source.anchor
-    const source = { label: item.source.label, ...(typeof item.source.address === 'string' ? { address: item.source.address } : {}), ...(Number.isSafeInteger(item.source.page) && item.source.page! > 0 ? { page: item.source.page } : {}), ...(anchor && typeof anchor.exact === 'string' && Number.isSafeInteger(anchor.start) && anchor.start >= 0 && typeof anchor.prefix === 'string' && typeof anchor.suffix === 'string' ? { anchor: { exact: anchor.exact, start: anchor.start, prefix: anchor.prefix.slice(-128), suffix: anchor.suffix.slice(0, 128) } } : {}) }
+    const source = { label: item.source.label, ...(typeof item.source.address === 'string' ? { address: item.source.address } : {}), ...(typeof item.source.browserPageId === 'string' && /^pm-[a-z0-9-]{1,96}$/i.test(item.source.browserPageId) ? { browserPageId: item.source.browserPageId } : {}), ...(Number.isSafeInteger(item.source.page) && item.source.page! > 0 ? { page: item.source.page } : {}), ...(anchor && typeof anchor.exact === 'string' && Number.isSafeInteger(anchor.start) && anchor.start >= 0 && typeof anchor.prefix === 'string' && typeof anchor.suffix === 'string' ? { anchor: { exact: anchor.exact, start: anchor.start, prefix: anchor.prefix.slice(-128), suffix: anchor.suffix.slice(0, 128) } } : {}) }
     const annotation = store.add({ sessionId: item.sessionId, text: `[${source.label}]
 ${item.text}`, anchorText: item.text, anchorKey: undefined, occurrence: 0, note: item.note ?? '', externalSource: source, externalCaptureId: item.id })
     if (item.edit !== false) open(annotation, { x: Number.isFinite(item.point?.x) ? item.point!.x : 24, y: Number.isFinite(item.point?.y) ? item.point!.y : 100 })

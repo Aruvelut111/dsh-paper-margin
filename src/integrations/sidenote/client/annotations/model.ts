@@ -16,7 +16,7 @@
  */
 export interface Annotation {
   readonly externalCaptureId?: string
-  readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number; readonly anchor?: { exact: string; start: number; prefix: string; suffix: string } }
+  readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number; readonly browserPageId?: string; readonly anchor?: { exact: string; start: number; prefix: string; suffix: string } }
   /** Store-unique identity (monotonic across sessions). */
   readonly id: number
   /** 本批显示及 <annotation id> 编号，发送时冻结。 */

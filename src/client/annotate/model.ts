@@ -44,12 +44,14 @@ export function createAnnotation(input: {
   line?: number
   sessionId?: string
   sourceAddress?: string
+  browserPageId?: string
 }): Annotation {
   return {
     id: input.id,
     file: input.file,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     ...(input.sourceAddress ? { sourceAddress: input.sourceAddress } : {}),
+    ...(input.browserPageId ? { browserPageId: input.browserPageId } : {}),
     anchor: {
       page: input.page,
       quote: cleanSelection(input.quote),

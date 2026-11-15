@@ -26,6 +26,7 @@ export interface AnnotationAnchor {
 }
 
 export interface Annotation {
+  readonly browserPageId?: string
   readonly id: string
   readonly file: string
   readonly sessionId?: string
@@ -50,7 +51,7 @@ export function formatAnnotationXml(annotation: Annotation, index: number): stri
   // sidenote accepts scope, but not arbitrary attributes. Keep the visible
   // source in the quote too: its bubble parser intentionally ignores scope.
   const head = `<annotation id="${index}" scope="${escapeAttr(where)}" encoding="xml">`
-  const locatedQuote = `[${where}]\n${quote}` + (annotation.sourceAddress ? `\n${sourceLocator(annotation.sourceAddress, annotation.sessionId)}` : '')
+  const locatedQuote = `[${where}]\n${quote}` + (annotation.sourceAddress ? `\n${sourceLocator(annotation.sourceAddress, annotation.sessionId, annotation.browserPageId)}` : '')
   return note === ''
     ? `${head}\n<quote>${escapeXml(locatedQuote)}</quote>\n</annotation>`
     : `${head}\n<quote>${escapeXml(locatedQuote)}</quote>\n<note>${escapeXml(note)}</note>\n</annotation>`

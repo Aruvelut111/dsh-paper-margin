@@ -23,7 +23,7 @@
 
 发送的是选区、评论和来源信息。文件引用同时提供可读路径，Agent 会收到按需调用已有工具补读来源的指引；PDF 和 Office 文件需要可用的文档解析或转换工具。相对路径属于来源会话的工作目录，引用地址本身不授予文件访问权限。
 
-网页引用包含选文和 URL，不自动包含登录页面全文或截图。Agent 通过独立抓取工具打开 URL 时，登录态、动态内容和页面版本可能与侧栏不同。
+网页引用包含选文、URL 和原生页面标识。需要更多上下文时，Agent 可调用包内的 `paper_margin_browser`，直接读取同一张已打开网页，沿用它的登录态和动态内容，也可查找原句附近文字、分段继续读取。正文按需传给 Agent，返回读取时间、范围和页面版本。读取范围为已加载的主文档文字；图片、Canvas、内嵌框架和尚未加载的内容不在其中。[原生网页补读说明](docs/native-browser.md)。
 
 ## 安装
 
@@ -34,7 +34,7 @@
 先退出 DSH，在 PowerShell 中运行：
 
 ```powershell
-irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/install.ps1 | iex
+irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/install.ps1 | iex
 ```
 
 脚本下载并校验一个完整安装包，调用官方插件安装命令。旧双包用户也用这条命令升级：脚本会备份配置、移除旧配套包并保留注释和侧聊记录。完成后重新打开 DSH。[查看脚本](scripts/install.ps1)。
@@ -44,12 +44,12 @@ irm https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/ins
 首次安装可直接使用单个 URL：
 
 ```sh
-dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.5.9/dsh-paper-margin-2.5.9.tgz --ignore-scripts --save-exact
+dsh plugin --profile desktop add https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v2.6.0/dsh-paper-margin-2.6.0.tgz --ignore-scripts --save-exact
 ```
 
 Web 版将 `desktop` 改成 `web`。Windows Web 版升级可下载脚本后运行 `./install.ps1 -Profile web`。
 
-也可从 [v2.5.9 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.5.9) 下载 **`dsh-paper-margin-2.5.9.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
+也可从 [v2.6.0 Release](https://github.com/Aruvelut111/dsh-paper-margin/releases/tag/v2.6.0) 下载 **`dsh-paper-margin-2.6.0.tgz`**，在 DSH 的「插件 → 添加插件」中安装这一个文件。阅读器、网页批注、注释清单和侧聊均已包含，无需配套包。
 
 旧版分包安装请使用上面的一键脚本，以同时迁移旧 entry 覆盖项。配置迁移和来源见 [集成说明](docs/integration.md)。
 
@@ -63,7 +63,7 @@ Web 版将 `desktop` 改成 `web`。Windows Web 版升级可下载脚本后运�
 | Word | 使用 DSH 的 Office 转换和可选文字层 |
 | HTML | 「打开方式 → HTML 批注阅读」，适合静态文档 |
 | 图片 | 整图文字评论与文件来源 |
-| 原生浏览器网页（桌面版） | 划选网页正文、就地写评论，按会话与完整 URL 保存，可点击来源重新打开定位 |
+| 原生浏览器网页（桌面版） | 划选网页正文、就地写评论、回到来源；Agent 可按需补读同一张已登录页面 |
 
 扫描 PDF 需要文字层或外部 OCR。HTML 批注阅读保留内嵌样式，禁用原文脚本和外部资源。PPT 转换仍依赖宿主，尚未完成专项实测。图片评论目前不自动发送图片像素。
 
@@ -79,7 +79,7 @@ npm run check
 npm pack
 ```
 
-`check` 运行模块边界、类型、构建和单元测试。测试直接覆盖包内注释源码、阅读协议和旧 profile 迁移。真实宿主验证过侧栏关闭、双会话编号与发送隔离、删除重排及刷新恢复。
+`check` 运行模块边界、类型、构建和单元测试。测试直接覆盖包内注释源码、阅读协议和旧 profile 迁移。真实宿主验证过侧栏关闭、双会话编号与发送隔离、删除重排及刷新恢复；原生网页补读另测登录态、动态内容、查找、切页与会话隔离。
 
 PDF 本地读取检查：`npm run verify:open -- /path/to/book.pdf`。
 
@@ -87,4 +87,4 @@ PDF 本地读取检查：`npm run verify:open -- /path/to/book.pdf`。
 
 Paper Margin 内置文件阅读、文字定位、注释清单、持久化、原生发送事务和侧聊。原生查看器仍可从打开方式菜单选择。注释保存在当前浏览器站点的 localStorage，清除站点数据会删除本地注释。
 
-项目使用 [MIT](LICENSE) 许可证。感谢 [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的注释与侧聊实现、[dsh-cite-lens](https://github.com/adithyanraj03/dsh-cite-lens) 的引用定位算法，以及 PDF.js、DOMPurify、Schemastery 和 Cosmokit。来源、改编范围和许可证见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+项目使用 [MIT](LICENSE) 许可证。感谢 [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的注释与侧聊实现、[dsh-cite-lens](https://github.com/adithyanraj03/dsh-cite-lens) 的引用定位算法、[dsh-browser-bridge](https://github.com/alvinlui-hk/dsh-browser-bridge) 和 [dsh-sidebar-browser-agent](https://github.com/Hesitate-P/dsh-sidebar-browser-agent) 的原生网页桥接方案，以及 PDF.js、DOMPurify、Schemastery 和 Cosmokit。来源、改编范围和许可证见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。

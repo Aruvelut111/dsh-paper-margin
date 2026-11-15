@@ -12,7 +12,7 @@ Paper Margin 的阅读模块捕获原文和来源，包内注释模块管理草�
 | `edit` | `sessionId, id, point?, reply` | 打开原位编辑器 |
 | `remove` | `sessionId, id?, captureId?, reply` | 删除注释，支持重复确认 |
 
-`capture` 包含 `id?`、`sessionId`、`text`、`note?`、`source`、`point?` 和 `edit?`。`source` 包含 `label`、`address?`、`page?` 和文字锚点 `anchor?`。锚点保存 `exact/start/prefix/suffix`。
+`capture` 包含 `id?`、`sessionId`、`text`、`note?`、`source`、`point?` 和 `edit?`。`source` 包含 `label`、`address?`、`page?`、原生网页标识 `browserPageId?` 和文字锚点 `anchor?`。锚点保存 `exact/start/prefix/suffix`。
 
 `sessionId` 是发送目标，文件地址是引用来源。捕获 id 标识同一次选区；发送或删除后的重试不会新建注释，新选区使用新 id。修改已有记录时校验会话归属，提交期间保留未确认的编辑队列。
 
@@ -22,4 +22,6 @@ Paper Margin 的阅读模块捕获原文和来源，包内注释模块管理草�
 
 `<quote>` 保留 `[Source: …]` 原始来源地址；可解码的文件地址另附 `[File path: "…"]`。相对路径同时附来源会话 `[Source session: "…"]`，避免把另一个工作目录的同名文件当作来源。路径值使用 JSON 字符串转义，之后随整个 quote 做 XML 转义。不改变已有注释字段、编号、持久化键或反解析协议。
 
-这些字段是定位信息，不是全文内容或读取授权。插件通过现有系统提示词入口说明补读规则，文件与网页读取仍使用 Agent 已有工具。原生侧栏网页的登录态和页面全文没有通过该事件开放给模型。
+原生网页另附 `[Sidebar page: "…"]` 和 `[Source session: "…"]`。这些字段保持旧注释存储兼容，页面关闭重开后 id 需要重新确认。
+
+这些字段是定位信息，不是全文内容或读取授权。文件补读使用 Agent 已有工具。原生侧栏网页由包内 `paper_margin_browser` 按需读取同一张已加载页面，登录态留在 DSH 原生浏览器里。读取路由沿用官方鉴权，工具限定发起会话，具体范围见[原生网页补读](native-browser.md)。

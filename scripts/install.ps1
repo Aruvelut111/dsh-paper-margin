@@ -6,10 +6,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$version = '2.5.9'
+$version = '2.6.0'
 $release = 'https://github.com/Aruvelut111/dsh-paper-margin/releases/download/v' + $version
 $packageName = 'dsh-paper-margin-' + $version + '.tgz'
-$sha256 = '949287e5def704ea7ae36f1b71dfd5f3934552789dc824f4e83d12b48301e164'
+$sha256 = 'f14d1b51a4ed4d7024c0be22b9988d611b3692a4a62e3adaf59aec3e04f94987'
 
 if (-not $DshPath) {
     foreach ($base in @($env:LOCALAPPDATA, $env:ProgramFiles, ${env:ProgramFiles(x86)})) {

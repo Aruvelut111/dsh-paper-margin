@@ -32,7 +32,7 @@ import { sourceLocator } from '../../../../client/viewer/address.ts'
 
 export interface QuoteItem {
   readonly sessionId?: string
-  readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number }
+  readonly externalSource?: { readonly label: string; readonly address?: string; readonly page?: number; readonly browserPageId?: string }
   readonly text: string
   readonly note: string
   /** 本条消息中的编号，与原文角标一致。 */
@@ -51,7 +51,7 @@ export function formatAnnotationXml(index: number, item: QuoteItem): string {
   if (item.externalSource) {
     const escape = (value: string) => value.split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;')
     const address = item.externalSource.address
-    const quote = address ? item.text + '\n' + sourceLocator(address, item.sessionId) : item.text
+    const quote = address ? item.text + '\n' + sourceLocator(address, item.sessionId, item.externalSource.browserPageId) : item.text
     return '<annotation id="' + id + '" encoding="xml">\n<quote>' + escape(quote) + '</quote>' + (note === '' ? '' : '\n<note>' + escape(note) + '</note>') + '\n</annotation>'
   }
   return note === ''
